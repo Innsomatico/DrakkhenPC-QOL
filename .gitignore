@@ -1,0 +1,32 @@
+# NEVER commit Drakkhen game data - the whole point of this repo is that it ships none.
+*.CC1
+*.cc1
+*.?C1
+*.?C0
+*.1c1
+*.2c1
+*.6c1
+*.7c1
+*.8c1
+*.1c0
+*.2c0
+*.6c0
+*.7c0
+*.SAV
+*.sav
+*.SR
+*.DRK
+*.drk
+*.COM
+*.FNT
+*.7XT
+*.XT
+*.TAT
+*.AL
+*.IN
+DRK*
+
+# build/scratch
+__pycache__/
+*.pyc
+shot.png

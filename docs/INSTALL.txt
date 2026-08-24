@@ -1,0 +1,27 @@
+Drakkhen QOL patch (US GOG version)
+====================================
+
+Mods included:
+  * Compass in the 3D view (needle tracks your heading)
+  * World map on the M key, with your position flashing
+  * Spell/phial runes replaced with readable English letters
+  * Sorcerer/Priest MP regen at 1.5x while standing still in the world view
+  * Kill XP shared: every living party member gets 1/4 of each award
+  * Rings/staffs/phials show WHICH one they are next to the type name
+
+Install:
+  1. Copy install.ps1 into your Drakkhen game folder
+     (the one containing DRAKKHEN.COM and DRAKM.CC1 - for GOG typically
+      C:\Program Files\GOG Galaxy\Games\Drakkhen)
+  2. Right-click install.ps1 -> Run with PowerShell
+     (or from a terminal:  powershell -ExecutionPolicy Bypass -File install.ps1)
+
+The installer verifies your files are the stock US GOG version before touching
+anything, backs them up to _backup\original\, rebuilds the patched files from
+YOUR OWN game data, and verifies the result byte-for-byte. If any check fails
+it stops without changing your game.
+
+Uninstall:
+  powershell -ExecutionPolicy Bypass -File install.ps1 -Restore
+
+Save files are never touched by install or restore.
