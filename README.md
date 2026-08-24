@@ -113,6 +113,6 @@ builds entirely).
 
 ## Credits
 
-Reverse engineering, mods and tooling: Shawn Cherry, with Claude (Anthropic).
+Reverse engineering, mods and tooling: Innsomatico, with Claude (Anthropic).
 Drakkhen is © Infogrames 1990. This project is an unaffiliated fan patch; no game assets are
 distributed.
