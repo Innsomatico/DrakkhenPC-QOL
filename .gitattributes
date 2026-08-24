@@ -1,0 +1,4 @@
+# The installers are verified by SHA256 - store them byte-exact, no line-ending conversion.
+install.ps1 -text
+install.py -text
+SHA256SUMS.txt -text
