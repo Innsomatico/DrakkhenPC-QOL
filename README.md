@@ -1,8 +1,8 @@
 # DrakkhenPC-QOL
 
-Quality-of-life patch for **Drakkhen** (Infogrames, 1990) — the DOS version sold on GOG (US release,
-VGA). A set of small binary mods that make the game dramatically more playable without changing its
-character.
+Quality-of-life patch for **Drakkhen** on PC (Infogrames, 1990) — the MS-DOS version sold on GOG
+(US release, VGA), as played under DOSBox. A set of small binary mods that make the game
+dramatically more playable without changing its character.
 
 ## Features
 
@@ -91,6 +91,25 @@ US GOG install providing the pristine originals in `_backup/original/`:
 python tools/drakmod.py        # build the modded DRAKM.CC1 + RESI_VGA.6C0
 python tools/make_patcher.py   # regenerate install.ps1 from the current build
 ```
+
+## Who this is for
+
+If you ever bounced off Drakkhen on PC, it was probably one of these — each is what this patch fixes:
+
+- **"How do I know where I am?"** — the DOS version shipped with no in-game map and no compass.
+  You navigated a featureless 3D plain by memory. This patch adds both: a world map on the `M` key
+  showing your position, and an always-on compass in the 3D view.
+- **"Why are the spell names unreadable symbols?"** — spells and phials are labeled in a runic
+  display font. Underneath, the names were always English (one rune per letter); this patch swaps
+  the font so HEALMIN, TELEPOR and friends read as themselves.
+- **"Which ring / staff / phial is this?"** — inventory just says "ring". The patch shows the
+  contained spell's name next to the item type.
+- **"Only the killer gets XP?"** — kill experience now splits evenly among living party members.
+- **"The bow is useless"** — it shipped as the weakest weapon in the game; now it's worth carrying.
+
+Only the **US GOG release** is supported — the installer verifies your files by checksum and
+refuses anything else (floppy versions, other regions, and the SNES/Amiga ports are different
+builds entirely).
 
 ## Credits
 
