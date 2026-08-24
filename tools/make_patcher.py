@@ -74,11 +74,18 @@ def main():
         'RDIFF_LINES':     rdiff_lines,
         'MAP_B64':         base64.b64encode(mapdrk).decode(),
     }
-    tpl = open(os.path.join(HERE, 'patcher_template.ps1'), encoding='utf-8').read()
-    for k, v in subst.items():
-        tpl = tpl.replace('@@' + k + '@@', v)
-    assert '@@' not in tpl, 'unsubstituted placeholder left in template'
-    open(os.path.join(OUT, 'install.ps1'), 'w', encoding='utf-8', newline='\r\n').write(tpl)
+    for tname, oname, nl in (('patcher_template.ps1', 'install.ps1', '\r\n'),
+                             ('patcher_template.py', 'install.py', '\n')):
+        tpl = open(os.path.join(HERE, tname), encoding='utf-8').read()
+        for k, v in subst.items():
+            tpl = tpl.replace('@@' + k + '@@', v)
+        assert '@@' not in tpl, 'unsubstituted placeholder left in ' + tname
+        open(os.path.join(OUT, oname), 'w', encoding='utf-8', newline=nl).write(tpl)
+    # published checksums for both installers
+    sums = ''
+    for f in ('install.ps1', 'install.py'):
+        sums += '%s  %s\n' % (sha(os.path.join(OUT, f)), f)
+    open(os.path.join(OUT, 'SHA256SUMS.txt'), 'w', newline='\n').write(sums)
 
     open(os.path.join(OUT, 'README.txt'), 'w', newline='\r\n').write('''Drakkhen QOL patch (US GOG version)
 ====================================

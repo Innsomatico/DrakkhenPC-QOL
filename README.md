@@ -17,6 +17,10 @@ character.
 
 ## Install
 
+Two installers, **identical behavior** — pick whichever you trust more:
+
+**PowerShell** (no dependencies on any Windows machine):
+
 1. Copy `install.ps1` into your Drakkhen game folder — the one containing `DRAKKHEN.COM` and
    `DRAKM.CC1` (for GOG typically `C:\Program Files\GOG Galaxy\Games\Drakkhen`).
 2. Run it:
@@ -25,16 +29,37 @@ character.
    powershell -ExecutionPolicy Bypass -File install.ps1
    ```
 
+**Python** (any Python 3, standard library only, nothing to pip install):
+
+```
+python install.py "C:\Program Files\GOG Galaxy\Games\Drakkhen"
+```
+
+Uninstall with `install.ps1 -Restore` or `python install.py --restore` respectively.
+
 The installer **verifies your files are the stock US GOG version by SHA256 before touching
 anything**, backs them up to `_backup\original\`, rebuilds the patched files from *your own* game
 data, and verifies the result byte-for-byte against the reference build. If any check fails, it
 stops without changing your game. Save files are never touched.
 
-Uninstall:
+## Is this safe to run?
 
-```
-powershell -ExecutionPolicy Bypass -File install.ps1 -Restore
-```
+A healthy question for any script off the internet. What you can check yourself:
+
+- **Both installers are plain text.** Open them in any editor — every line is auditable. There is
+  no obfuscation, no downloading, no network access of any kind, and nothing touched outside the
+  game folder you point them at.
+- **They refuse to run on anything but the exact stock files.** Your game files are SHA256-verified
+  before a single byte changes, and the rebuilt files are verified against the reference build
+  after. Any mismatch aborts with nothing modified.
+- **Your originals are backed up first** (`_backup\original\`) and one command restores them.
+- **Checksums of both installers are published** in [`SHA256SUMS.txt`](SHA256SUMS.txt). Verify your
+  download with `certutil -hashfile install.ps1 SHA256` (Windows) or `sha256sum` before running.
+- Both installers are **generated from the sources in [`tools/`](tools/)** — you can rebuild them
+  yourself and diff the result.
+
+A signed `.exe` installer would actually be *less* inspectable than these scripts; transparency is
+the trust model here.
 
 ## No game files here
 
