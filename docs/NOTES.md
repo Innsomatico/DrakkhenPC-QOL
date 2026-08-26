@@ -202,6 +202,36 @@ booleans):
 - **Wrap limit 40 chars**: the line builder 0A4A:033D fills DS:5426 with stride 0x28, ~4-5 lines.
 - Engine string draw: `lcall 0A4A:0241 (far ptr, x, y)`.
 
+## DRAKTJ.CC1 - the character-creation program (research for the starting-gear mod)
+GOAL (user's explicit spec): SCOUT class starts with the bow, MAGICIAN/SORCERESS with a RESTORE
+ring - patched into the CREATION CODE so every new character gets them. NOT a save edit.
+- Container: 2 chunks (159656 MZ + 614). Analysis copies: `_tools/../_backup/... none` - unpack
+  fresh via drakpack from ../DRAKTJ.CC1. Scratch copy used: scratchpad/unpacked/DRAKTJ.CC1.00.bin.
+  All img offsets below are into that decoded chunk 0.
+- **DGROUP file base = 0x22DF0** (NOT the same layout as DRAKM: stat templates at DS:1A73 here,
+  vs DRAKM's 1BBF; derive any DS:x as file 0x22DF0+x).
+- Character records live at **DS:4BBE** (4 x 0x19A, same record layout as DRAKM's DS:5A2E).
+  PERSO.SAV writer/loader ~img 0x6A00-0x6DB5 (same XOR i&0xFF + u16 sum-of-encoded checksum).
+- **Creation record-init**: img ~0x13290-0x1348C. Reads a 0x1C-stride per-class spec at **DS:0D00**
+  (`spec = 0xD00 + class*0x1C`, loaded at img 0x1330B). Writes stats (template DS:1A73 + rand(4)),
+  maxHP/level like DRAKM, and inventory slots 0/1 as spell-book entries (img 0x13414-0x13443) -
+  NOTE these slots end up EMPTY in a fresh save, so something later clears/overwrites them.
+- **Spec DS:0D00 does NOT hold gear**: fields identified = +0 name prefix (Ara/Sco/Doi/War/Kni/
+  Lor/Por/Dan), +4 stat-template idx, +8&0xF (class group, cmp 7 at img 0x134FD), +0xB/+0x11
+  (spell-book byte2 values), +0xE (XP pool), +0x10 (MP class), +0x12/+0x13 (sprite ids).
+- **Give-item helpers**: img 0x0DB12 (memcpy 6 bytes into first free WEAPON slot, record+0x64
+  scan) and img 0x0DB9C (ITEM area, record+0x94). Take (char_far, item_far) cdecl.
+- **NEXT STEP - the untraced part**: the per-class wearable-gear grant (slots 2-4: shoes/armor/
+  weapon, catalog-record copies) is in the branch chain from **img 0x134F2** (starts by reading
+  spec[+8]&0xF and comparing to 7, then class-specific paths; shl al,3 / add al,0x14 at 0x13502
+  suggests a computed table index). Trace where it fetches the catalog entries (DRAKTJ has the
+  same catalog data - 'fighter-shoes' record found at file 0x24BD8 = DS:1DE8-ish region), then
+  either patch the per-class selection bytes (if table-driven) or splice the give-item calls.
+- Patch delivery once found: new mod file patches DRAKTJ.CC1 (decode chunk0, edit, repack container
+  like DRAKM), add as 4th file to installers with its own stock/steam SHA gates (Steam's
+  DRAKTJ.CC1 hash must be checked - its .BAKs exist for DRAKC/DRAKE/DRAKM but DRAKTJ was NOT
+  in Steam's .BAK set, so verify whether Steam's DRAKTJ matches GOG's before assuming).
+
 ## Message / name tables (all far-ptr tables in DGROUP; bases handed out at img 0x3BA1)
 - **DS:2A02**: 88 entries. 0-3 level-up ('Ability', 'gets', ' Hit points'), 4-16 status msgs,
   **17-42 item type names** (spell book, sceptre, phial, ring, ... key), **43-50 class names**,
