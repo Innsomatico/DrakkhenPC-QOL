@@ -191,13 +191,28 @@ writes" conclusion was wrong because the copy goes through a helper, not literal
   catalog1 (DS:1DE8).
 - The column index is `rand(4) + [0x5F06]/2` (a stat), i.e. better stats -> better starting tier.
 
-REMAINING UNKNOWN (do this first next time)
-How the ROW is selected: it comes from the return of `lcall 161C:0342` at img 0x17C50, which
-disassembles as drawing code - the disassembly is mis-aligned there, so re-disassemble that
-function from a known-good entry. Once row<-class is proven, the feature is a ONE-BYTE-PER-ENTRY
-data patch: set the scout's row to 07 (bow) - no code, no dead space.
-CAUTION: do not guess the row mapping and ship it; if a row is shared between classes the wrong
-class starts with a bow.
+**CRITICAL TOOLING FIX** (cost hours): DRAKTJ chunk0 is its own MZ EXE with a **0x2800-byte
+header** (640 paragraphs; DRAKM's is 0x2A00). Converting seg:off -> file offset REQUIRES
+`file = 0x2800 + seg*16 + off`. Its DGROUP segment is **0x205F** (so DS:x -> file
+0x2800 + 0x205F*16 + x). Without the header offset, disassembly silently lands mid-instruction and
+looks like unrelated code - that is what made 161C:0342 appear to be a draw routine.
+
+USER CORRECTION (2026-08-26): do NOT infer row<-class from save slot order. Slot order is the
+order the PLAYER creates characters in, not a class id. (In the reference fresh save the user
+created Fighter, Scout, Magician, Priest in that order, so slots 0-3 map to those classes - but
+that is the user's chosen order, not evidence about table rows.) Find explicit class-keyed code.
+
+ROW SELECTOR, correctly disassembled: `161C:0342` is a **bitfield getter** - args
+(field_index, packing_byte, 0). The weapon row is `getter(0x58, 0x30)`, armour `getter(0x5a, 0x20)`.
+It reads word[field_index] from a far pointer at **DS:5F30** and masks it with
+DS:2FC0[hi_nibble - lo_nibble] (mask table = 0,1,3,7,0F,1F,3F,7F).
+DS:5F30 is set at img 0x19762 to `buf + word[buf+8]` after a loader reads a **210-byte** file into
+DS:5F44. TESTED AND FALSIFIED: feeding OBJET.6SR through that chain yields word[0x58]=0 and
+word[0x5a]=0, i.e. dagger/first-tier for everyone - which contradicts the observed fighter sword.
+So either a different 210-byte file is loaded on this path, or DS:5F30 is re-pointed elsewhere
+before the grant runs.
+NEXT: identify the file that loader opens (walk back from img 0x19710 to its filename/open), or
+find other writers of DS:5F30. Then read field 0x58 per class from the real source.
 
 NOTE ON THE RING: rings are NOT catalog items (the catalog starts at shoes), so a starting RESTORE
 ring cannot come from this table at all. Granting one needs a synthesised 6-byte record passed to
