@@ -174,12 +174,34 @@ RULED OUT (do not re-investigate)
   DRAKM 0xCA20 are all SHOP buy/sell paths.
 - give-item 140D:0819 (DRAKTJ) / 1435:0815 (DRAKM): all 4 callers are shop code.
 
-NEXT LEAD
-DRAKM's character-init at img 0x10E70-0x10FCB writes record fields AND inventory slot bytes at
-+0x64/+0x66/+0x67/+0x6A/+0x6B/+0x6D (img 0x10F07-0x10F43) - that IS in-game inventory writing.
-Follow what runs after it (the branches from img 0x10FDA, mirroring DRAKTJ 0x134DA) and find the
-call that copies catalog records into slots 2+. Patch there, or patch whatever per-class index
-feeds it. Everything needed is in DRAKM, so no 4th file and no DRAKTJ hash gate is required.
+BREAKTHROUGH (2026-08-25, later): the grant IS in DRAKTJ after all - the earlier "no inventory
+writes" conclusion was wrong because the copy goes through a helper, not literal offsets.
+- **give-item helper = DRAKTJ img 0x170E9**: takes (char_far, item_record_far, qty); finds the
+  first free slot via 0xB11:01AF, memcpy's 6 bytes to `record + 0x64 + slot*6`, then sets byte +5
+  to the qty argument (which is why starting gear = catalog record with price replaced by qty 1).
+  Four callers: 0x17361, 0x1744F (shop buy paths) and **0x17CAA, 0x17D64 (the auto-grant)**.
+- **STARTING-WEAPON TABLE = DS:1AF3**, 8 rows x 6 bytes, values are indices into catalog2
+  (DS:1ED2). Decoded:
+    row0 dagger x6      row1 sword,sword,sword,swordlg,swordlg,sabre
+    row2 bludgeon x6    **row3 BOW x6**      row4 rod x6
+    row5 sword..sabre   row6 sword..drags    row7 dagger/sword mix
+  Observed fresh-party weapons map to rows: fighter->1, scout->0, magician->4, priest->2, so the
+  row is class-derived and **row 3 (all bow) already exists** - the mechanism we want is shipped.
+- Armour/other gear uses the sibling site at img 0x17D35 with table **DS:1AC3** (also 8x6) into
+  catalog1 (DS:1DE8).
+- The column index is `rand(4) + [0x5F06]/2` (a stat), i.e. better stats -> better starting tier.
+
+REMAINING UNKNOWN (do this first next time)
+How the ROW is selected: it comes from the return of `lcall 161C:0342` at img 0x17C50, which
+disassembles as drawing code - the disassembly is mis-aligned there, so re-disassemble that
+function from a known-good entry. Once row<-class is proven, the feature is a ONE-BYTE-PER-ENTRY
+data patch: set the scout's row to 07 (bow) - no code, no dead space.
+CAUTION: do not guess the row mapping and ship it; if a row is shared between classes the wrong
+class starts with a bow.
+
+NOTE ON THE RING: rings are NOT catalog items (the catalog starts at shoes), so a starting RESTORE
+ring cannot come from this table at all. Granting one needs a synthesised 6-byte record passed to
+the give-item helper - a code hook, not a data edit. Split it from the bow half.
 
 ### 17. Steam version support — **DONE** (2026-08-25)
 The Steam release = GOG stock with exactly ONE byte changed per engine (.CC1): Steam's own
