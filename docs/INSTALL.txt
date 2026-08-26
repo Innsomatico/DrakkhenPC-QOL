@@ -12,7 +12,8 @@ Mods included:
     Impalpability). The stock game shipped these effects unwired.
   * Class-based stat growth on level-up (the stock game grants none at all)
   * Kill XP shared: every living party member gets 1/4 of each award
-  * Bow buffed from weakest weapon in the game to a real choice, renamed from "arch"
+  * Bow buffed from weakest weapon in the game to a real choice (power 8, on par with
+    the short sword), renamed from "arch"
   * Copy-protection code prompt removed; video-card menu skipped (always VGA)
 
 Install:
@@ -31,3 +32,15 @@ Uninstall:
   powershell -ExecutionPolicy Bypass -File install.ps1 -Restore
 
 Save files are never touched by install or restore.
+
+Optional: use a modern DOSBox
+-----------------------------
+GOG and Steam both ship DOSBox 0.74 (2010). DOSBox Staging is a maintained fork
+with sharper output, CRT/HD shaders, far better AdLib music emulation, and
+modern fullscreen handling. This patch does NOT include it - download the
+portable zip yourself from https://dosbox-staging.github.io/ , then run:
+
+  python staging_setup.py <your game folder> <your unpacked Staging folder>
+
+That points your existing GOG/Steam Play button at Staging (originals backed up;
+undo with  staging_setup.py <game folder> --restore ).

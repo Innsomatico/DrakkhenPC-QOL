@@ -150,17 +150,36 @@ User confirmed Recuperation (regen doubles, shows in ability list after sheet re
 Invisibility in play. Sheet refresh on equip is a known cosmetic lag. Stat+2 rings from the SNES
 guide: judged not worth the code (user's call).
 
-### 16. Starting equipment — save edit was a STOPGAP, the real feature is a DRAKTJ patch
-USER CORRECTION (2026-08-25): the ask was always to edit the CREATION CODE so new characters are
-born with the gear - NOT to edit saves. The save edit on the user's own party stands as their
-local state only. Research so far on DRAKTJ.CC1 (the character-creation program, own MZ container,
-DGROUP layout differs from DRAKM): save writer/loader found (records at DS:4BBE, same XOR+checksum
-format); record-init routine at img 0x1339x-0x1348x (writes slots 0/1 spell-book entries from a
-creation-spec struct, stat rolls from template DS:1A73, HP/level init identical in shape to
-DRAKM's); give-item helper at img 0x0DB12 (+0x64 weapons area) / 0x0DB9C (+0x94 items area);
-the per-class wearable-gear grant (slots 2-4) is in the per-class branches from img ~0x134F2 -
-NEXT STEP: finish tracing those branches, then patch scout->+bow, mage->+RESTORE ring there, and
-add DRAKTJ.CC1 to the build + installers as a fourth patched file.
+### 16. Starting equipment — STILL OPEN, large trace; findings + dead ends below
+GOAL (user, unchanged): new characters born with gear - SCOUT +bow, MAGICIAN +RESTORE ring.
+NOT a save edit. The user's own save already has them; this is for everyone else.
+
+CONFIRMED FACTS
+- Observed starting gear (from a real fresh save): fighter shoes/jacket/buckler/sword
+  (catalog idx 4,8,0x22,0x2C), scout shoes/leather/dagger (4,9,0x2B), magician shoes/robe/rod
+  (4,0x14,0x30), priestess shoes/robe/bludgeon (4,0x11,0x31). All are catalog records copied with
+  the price byte replaced by quantity 1 - there is NO separate starting-gear record template
+  anywhere in either binary (searched for every gear record with qty=1: no hits).
+- Catalog bases: DRAKM DS:1F34 (idx 4..0x2A) + DS:201E (idx 0x2B..0x32);
+  DRAKTJ DS:1DE8 + DS:1ED2. DRAKTJ DGROUP file base = 0x22DF0.
+- **DRAKTJ (the creator) does NOT build inventory**: an exhaustive scan finds no 6-byte record copy
+  anywhere in its creation region (0x12000-0x14000). So the grant happens in the GAME, not the
+  creator - the earlier plan to patch DRAKTJ was based on a wrong premise.
+
+RULED OUT (do not re-investigate)
+- DS:0D00 (0x1C stride) - creation spec: names/stat-template/MP class/sprites, no gear.
+- DS:1AC3 (DRAKTJ) / DS:1C0F (DRAKM), 8 rows x 6 - per-class ARMOUR/WEAPON TIER lists (helmet
+  tiers etc., used by shops+loot), not starting gear.
+- DS:187A - signed coordinate deltas. The 0x1AC3-indexing sites at DRAKTJ 0x0F110/0x1A670 and
+  DRAKM 0xCA20 are all SHOP buy/sell paths.
+- give-item 140D:0819 (DRAKTJ) / 1435:0815 (DRAKM): all 4 callers are shop code.
+
+NEXT LEAD
+DRAKM's character-init at img 0x10E70-0x10FCB writes record fields AND inventory slot bytes at
++0x64/+0x66/+0x67/+0x6A/+0x6B/+0x6D (img 0x10F07-0x10F43) - that IS in-game inventory writing.
+Follow what runs after it (the branches from img 0x10FDA, mirroring DRAKTJ 0x134DA) and find the
+call that copies catalog records into slots 2+. Patch there, or patch whatever per-class index
+feeds it. Everything needed is in DRAKM, so no 4th file and no DRAKTJ hash gate is required.
 
 ### 17. Steam version support — **DONE** (2026-08-25)
 The Steam release = GOG stock with exactly ONE byte changed per engine (.CC1): Steam's own

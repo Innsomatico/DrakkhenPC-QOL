@@ -1,4 +1,4 @@
-"""Mod: make the bow a viable ranged weapon (power 6 -> 12, price 8 -> 16), and call it "bow".
+"""Mod: make the bow a viable ranged weapon (power 6 -> 8, price 8 -> 12), and call it "bow".
 
 The item catalog is an array of 6-byte records (flags, tier, POWER, id, PRICE, 0) - see NOTES.md.
 The bow ("arch", id 0x41) is catalog index 0x32, record at DS:2048, and ships as the weakest weapon
@@ -15,7 +15,10 @@ reader - see ROADMAP.md item 12.
 """
 BOW_REC = 0x1FD40 + 0x2048          # image-linear address of the bow's catalog record
 OLD = bytes.fromhex('2f0106410800')
-NEW = bytes.fromhex('2f010c411000')   # power 12, price 16
+# v2 (user's balance call after play): power 12 made the bow dominant early and the curve broke.
+# 8 matches the short sword - clearly better than the stock 6, and mod_levelup's stat growth is
+# what carries the character from there instead of the weapon doing all the work.
+NEW = bytes.fromhex('2f0108410c00')   # power 8, price 12
 
 NAME_ARCH = 0x1FD40 + 0x308E        # 'arch' + NUL in the item name strings
 
@@ -26,4 +29,4 @@ def apply(b):
     b.img[BOW_REC:BOW_REC + 6] = NEW
     assert bytes(b.img[NAME_ARCH:NAME_ARCH + 5]) == b'arch\x00', 'arch string not found'
     b.img[NAME_ARCH:NAME_ARCH + 5] = b'bow\x00\x00'
-    print('  bow: power 6->12, price 8->16, renamed arch->bow')
+    print('  bow: power 6->8, price 8->12, renamed arch->bow')
