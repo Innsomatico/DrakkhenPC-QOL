@@ -117,6 +117,46 @@ patching every reader, plus unresearched drop tables - user chose the fallback: 
 the bow's own catalog record to power 12, price 16. Every bow bought or dropped from now on uses it;
 bows already sitting in a save keep their old copied stats (drop/rebuy to upgrade).
 
+### 13. Quest journal — researched, DESIGN READY, effort M (v1) / L (v2)
+User supplied the authoritative 15-step walkthrough (see NOTES.md) and wants a journal that shows
+completed + current steps and HIDES future ones (no spoilers).
+
+**Design (v1, cheap):** the map mod already proves the pattern - a pre-rendered 256x128 image blitted
+into the viewport from an external file, one INT 21h row-read at a time, no heap. So render the 15
+journal lines OFFLINE into `QUEST.DRK` (our own text, our own font, laid out exactly as we want), and
+at runtime **read only the first N rows** - stopping early is what hides unseen steps. Reuses
+mod_map's proven loop almost verbatim; ~80-120 B of engine code, and the text costs zero engine space.
+
+**Blocker for auto-progress (v2):** N must come from somewhere. The DS:6F38 counters are the right
+shape (per-location, incremented on story interactions) but the index->step mapping cannot be derived
+statically. Closing it needs memprobe snapshots at known walkthrough points during a real playthrough.
+**Ship v1 with a manual/heuristic step first; add auto-detection once the mapping is observed.**
+
+### 14. Clearer dialogue English — effort M, confidence high, NOT started
+User's point: the original prose is cryptic even in-game ("Gems are tears"), so a journal that quotes
+it faithfully just relocates the confusion. The .7XT files are loose, uncompressed and directly
+editable (high-bit ASCII, NUL-separated). Same-length rewrites are trivial; different lengths need
+the offset table rebuilt. Hard limit: **40 chars per line** (DS:5426 stride 0x28). Highest-value
+targets are the lines that name a destination or a required action.
+
+### 15. Ring/sceptre effects wired — **DONE, user-verified** (2026-08-25)
+Research: worn rings were INERT in stock (live-probed: no flag changes). The engine ships seven
+passive-effect flags its sheet lister names (Power/Invisibility/Acceleration/Understanding/
+Recuperation/Protection/Impalpability) and its regen code honors - nothing ever set them.
+`mod_ring.py` (170 B): both regen call sites wrapped; equipped rings/sceptres (variant = spell idx)
+map to effects: INVISIB->Invisibility, STRENGH->Power, LANGUAG->Understanding, SHIELD->Protection,
+SPEED->Acceleration, RESTORE->Recuperation (2x regen), TELEPOR->Impalpability. Stateless per tick.
+User confirmed Recuperation (regen doubles, shows in ability list after sheet reopen) and
+Invisibility in play. Sheet refresh on equip is a known cosmetic lag. Stat+2 rings from the SNES
+guide: judged not worth the code (user's call).
+
+### 16. Starting equipment (save-side) — **DONE for the user's party** (2026-08-25)
+User's fresh party edited: SCOUT +bow, MAGICIAN +RESTORE ring. NOTE: this is a SAVE edit - other
+players' created characters get stock gear. A universal version means patching the creation
+program (DRAKTJ.CC1) - parked; see also 17.
+
+### 17. Steam version support — TODO (needs the user's Steam install files to hash/compare)
+
 ---
 
 ## Suggested order

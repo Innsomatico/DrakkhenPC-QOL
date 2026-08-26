@@ -12,7 +12,7 @@ SPELL INDEX, so the spell-name strings already resident at DS:08C4 records can l
 Hook = wrapper spliced over the name-draw far call.  It re-pushes the four argument words (the
 callee is cdecl - our extra far return address would shift its [bp+n] frame otherwise), draws the
 generic name, then for id in {sceptre, phial, ring, rod} with variant 1..23 pushes the spell
-record's name far-ptr and draws it at x+0x2A on the same row.  The item record is reached through
+record's name far-ptr and draws it at x+0x1E on the same row (tightened per user feedback).  The item record is reached through
 the caller's own saved pointer at [caller_bp-0x10/-0x0E], so any misreading of the record layout
 elsewhere cannot desync this mod.  Unknown or zero variants draw nothing extra.
 """

@@ -40,6 +40,7 @@ def main():
     stock_resi  = open(os.path.join(GAME, '_backup', 'original', 'RESI_VGA.6C0'), 'rb').read()
     mod_resi    = open(os.path.join(GAME, 'RESI_VGA.6C0'), 'rb').read()
     mapdrk      = open(os.path.join(GAME, 'MAP.DRK'), 'rb').read()
+    questdrk    = open(os.path.join(GAME, 'QUEST.DRK'), 'rb').read()
 
     so = [raw for *_, raw in drakpack.unpack_container(stock_drakm)]
     sm = [raw for *_, raw in drakpack.unpack_container(mod_drakm)]
@@ -73,6 +74,8 @@ def main():
         'DIFF_LINES':      diff_lines,
         'RDIFF_LINES':     rdiff_lines,
         'MAP_B64':         base64.b64encode(mapdrk).decode(),
+        'QUEST_SHA':       __import__('hashlib').sha256(questdrk).hexdigest(),
+        'QUEST_B64':       base64.b64encode(questdrk).decode(),
     }
     for tname, oname, nl in (('patcher_template.ps1', 'install.ps1', '\r\n'),
                              ('patcher_template.py', 'install.py', '\n')):
@@ -93,10 +96,16 @@ def main():
 Mods included:
   * Compass in the 3D view (needle tracks your heading)
   * World map on the M key, with your position flashing
+  * Quest hints on the H key (SPACE reveals the next hint - spoilers are your choice)
   * Spell/phial runes replaced with readable English letters
-  * Sorcerer/Priest MP regen at 1.5x while standing still in the world view
+  * Rings/sceptres/phials show WHICH one they are next to the type name
+  * Rings and sceptres now WORK: wearing one grants its effect (Invisibility,
+    Protection, Recuperation = double regen, Acceleration, Power, Understanding,
+    Impalpability). The stock game shipped these effects unwired.
+  * Class-based stat growth on level-up (the stock game grants none at all)
   * Kill XP shared: every living party member gets 1/4 of each award
-  * Rings/staffs/phials show WHICH one they are next to the type name
+  * Bow buffed from weakest weapon in the game to a real choice, renamed from "arch"
+  * Copy-protection code prompt removed; video-card menu skipped (always VGA)
 
 Install:
   1. Copy install.ps1 into your Drakkhen game folder

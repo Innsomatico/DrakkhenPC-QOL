@@ -47,6 +47,17 @@ SPACE = [
     (0x1958, 0x1A30 - 0x1958, 'orphan filename tables 1-2 (DS:1958..1A30)'),
 ]
 
+# Code-segment dead space, given as absolute image-linear ranges (not DGROUP-relative).
+# The copy-protection routine 0D7E:19B1..0D7E:1B78 (img 0xF191..0xF359, 456 B) is unreachable once
+# mod_noprotect disables the gate: an exhaustive scan of every near/far call and jmp in the image
+# finds exactly ONE entry into that range - the gate's own `call 0x19B1` at img 0xF38A, which the
+# counter patch guarantees never executes. Everything the routine used (dialog draw 0D7E:18B0, the
+# quete.fnt table) is only referenced from inside it.
+# REQUIRES mod_noprotect to be in the build - assert it before allocating here.
+CODE_SPACE = [
+    (0xF191, 0xF359 - 0xF191, 'copy-protection routine (dead once mod_noprotect is applied)'),
+]
+
 class Builder:
     def __init__(self):
         chunks = [raw for *_, raw in drakpack.unpack_container(open(ORIG, 'rb').read())]
@@ -64,6 +75,8 @@ class Builder:
         self.added = []
         self.allocated = []            # (linear start, size) of every alloc()
         self.free = [[DGROUP*16 + o, n, d] for o, n, d in SPACE]
+        self.code_free = [[o, n, d] for o, n, d in CODE_SPACE]
+        self.noprotect = False        # set by mod_noprotect; gates use of CODE_SPACE
         assert self.img[DGROUP*16+4: DGROUP*16+11] == b'Turbo-C', 'not the expected engine build'
 
     # --- space -------------------------------------------------------------
@@ -89,8 +102,31 @@ class Builder:
         raise RuntimeError('out of verified-dead space; need %d bytes (free: %s)'
                            % (size, [b[1] for b in self.free]))
 
+    def alloc_code(self, size, want_paragraph=True):
+        """Reserve dead CODE space (see CODE_SPACE). Only legal once mod_noprotect has run."""
+        assert self.noprotect, 'alloc_code() requires mod_noprotect in the build (it is what kills '                                'the only path into that code)'
+        for blk in self.code_free:
+            base, avail = blk[0], blk[1]
+            start = (base + 15) & ~15 if want_paragraph else base
+            pad = start - base
+            if avail - pad >= size:
+                blk[0], blk[1] = start + size, avail - pad - size
+                self.allocated.append((start, size))
+                stale = [lin for lin in self.relocs if start <= lin < start + size]
+                for lin in stale:
+                    del self.relocs[lin]
+                if stale:
+                    print('  (dropped %d stale relocations inside code region %05x..%05x)'
+                          % (len(stale), start, start + size))
+                return start >> 4, start & 0xF, start
+        raise RuntimeError('out of dead code space; need %d bytes (free: %s)'
+                           % (size, [b[1] for b in self.code_free]))
+
     def remaining(self):
         return sum(b[1] for b in self.free)
+
+    def remaining_code(self):
+        return sum(b[1] for b in self.code_free)
 
     # --- placement ---------------------------------------------------------
     def put(self, lin, blob):
@@ -172,14 +208,18 @@ def build(mods):
     for m in mods:
         m(b)
     p = b.save()
-    print('built %s  (%d mods, %d bytes of dead space left)' % (os.path.basename(p), len(mods), b.remaining()))
+    print('built %s  (%d mods, %d B data dead space + %d B code dead space left)'
+          % (os.path.basename(p), len(mods), b.remaining(), b.remaining_code()))
     return p
 
 if __name__ == '__main__':
-    import mod_compass, mod_map, mod_regen, mod_partyxp, mod_itemname, mod_bow, mod_spellfont
+    import mod_compass, mod_map, mod_regen, mod_partyxp, mod_itemname, mod_bow, mod_noprotect, mod_journal, mod_levelup, mod_ring
+    import mod_spellfont, mod_novideomenu
     # mod_regen is DROPPED (user's call, 2026-08-23): a crash on packing characters ended it.
     # The mod file and the research in NOTES.md/ROADMAP.md remain if it is ever revisited.
     build([mod_compass.apply, mod_map.apply,
-           mod_partyxp.apply, mod_itemname.apply, mod_bow.apply])
+           mod_partyxp.apply, mod_itemname.apply, mod_bow.apply, mod_noprotect.apply, mod_journal.apply, mod_levelup.apply, mod_ring.apply])
     # Data-only mods: these patch loose game files, not the engine, so they cost no dead space.
-    mod_spellfont.apply_data(os.path.join(GAME, '_backup', 'original'), GAME)
+    orig = os.path.join(GAME, '_backup', 'original')
+    mod_spellfont.apply_data(orig, GAME)
+    mod_novideomenu.apply_data(orig, GAME)

@@ -21,6 +21,8 @@ MAP_SHA         = '@@MAP_SHA@@'
 DIFF_DRAKM = '''@@DIFF_LINES@@'''
 DIFF_RESI  = '''@@RDIFF_LINES@@'''
 MAP_B64    = '@@MAP_B64@@'
+QUEST_SHA  = '@@QUEST_SHA@@'
+QUEST_B64  = '@@QUEST_B64@@'
 
 
 # ---- BPE codec (mirrors the reference drakpack.py) --------------------------
@@ -126,6 +128,15 @@ def main():
             print('restored ' + f)
         if os.path.exists(mapf):
             os.remove(mapf); print('removed MAP.DRK (added by the patch)')
+        qf = os.path.join(g, 'QUEST.DRK')
+        if os.path.exists(qf):
+            os.remove(qf); print('removed QUEST.DRK (added by the patch)')
+        cfg = os.path.join(g, 'CONFIG.TAT')
+        if os.path.exists(cfg):
+            cb = bytearray(open(cfg, 'rb').read())
+            if len(cb) > 0x0B:
+                cb[0x0A:0x0C] = bytes([255, 255])
+                open(cfg, 'wb').write(bytes(cb)); print('restored CONFIG.TAT video-card prompt')
         print('Game restored to stock. Save files were not touched.')
         return
 
@@ -170,11 +181,24 @@ def main():
     open(drakm, 'wb').write(new_drakm)
     open(resi, 'wb').write(new_resi)
     open(mapf, 'wb').write(map_bytes)
+    quest_bytes = base64.b64decode(QUEST_B64)
+    if sha(quest_bytes) != QUEST_SHA:
+        fail('embedded QUEST.DRK failed verification.')
+    open(os.path.join(g, 'QUEST.DRK'), 'wb').write(quest_bytes)
+    # CONFIG.TAT: 0xFFFF at +0x0A = "ask for video card"; 4 = always VGA. Only flip the ask-me value.
+    cfg = os.path.join(g, 'CONFIG.TAT')
+    if os.path.exists(cfg):
+        cb = bytearray(open(cfg, 'rb').read())
+        if len(cb) > 0x0B and cb[0x0A] == 0xFF and cb[0x0B] == 0xFF:
+            cb[0x0A:0x0C] = bytes([4, 0])
+            open(cfg, 'wb').write(bytes(cb))
+            print('  CONFIG.TAT    - video-card menu skipped (always VGA)')
     print('')
     print('Patched successfully:')
     print('  DRAKM.CC1     - compass, M-key world map, shared XP, item names, bow buff')
     print('  RESI_VGA.6C0  - readable spell font')
     print('  MAP.DRK       - world map image (new file)')
+    print('  QUEST.DRK     - quest hints page for the H key (new file)')
     print('Originals are in _backup/original. Uninstall:  python install.py --restore')
 
 

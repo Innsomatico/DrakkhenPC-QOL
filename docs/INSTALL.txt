@@ -4,10 +4,16 @@ Drakkhen QOL patch (US GOG version)
 Mods included:
   * Compass in the 3D view (needle tracks your heading)
   * World map on the M key, with your position flashing
+  * Quest hints on the H key (SPACE reveals the next hint - spoilers are your choice)
   * Spell/phial runes replaced with readable English letters
-  * Sorcerer/Priest MP regen at 1.5x while standing still in the world view
+  * Rings/sceptres/phials show WHICH one they are next to the type name
+  * Rings and sceptres now WORK: wearing one grants its effect (Invisibility,
+    Protection, Recuperation = double regen, Acceleration, Power, Understanding,
+    Impalpability). The stock game shipped these effects unwired.
+  * Class-based stat growth on level-up (the stock game grants none at all)
   * Kill XP shared: every living party member gets 1/4 of each award
-  * Rings/staffs/phials show WHICH one they are next to the type name
+  * Bow buffed from weakest weapon in the game to a real choice, renamed from "arch"
+  * Copy-protection code prompt removed; video-card menu skipped (always VGA)
 
 Install:
   1. Copy install.ps1 into your Drakkhen game folder

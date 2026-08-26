@@ -31,6 +31,14 @@ if ($Restore) {
         Write-Host "restored $f"
     }
     if (Test-Path $map) { Remove-Item $map; Write-Host 'removed MAP.DRK (added by the patch)' }
+    $quest = Join-Path $GamePath 'QUEST.DRK'
+    if (Test-Path $quest) { Remove-Item $quest; Write-Host 'removed QUEST.DRK (added by the patch)' }
+    $cfg = Join-Path $GamePath 'CONFIG.TAT'
+    if (Test-Path $cfg) {
+        $cb = [IO.File]::ReadAllBytes($cfg)
+        if ($cb.Length -gt 0x0B) { $cb[0x0A] = 0xFF; $cb[0x0B] = 0xFF; [IO.File]::WriteAllBytes($cfg, $cb)
+            Write-Host 'restored CONFIG.TAT video-card prompt' }
+    }
     Write-Host 'Game restored to stock. Save files were not touched.' -ForegroundColor Green
     exit 0
 }
@@ -138,6 +146,8 @@ $diffResi = @'
 @@RDIFF_LINES@@
 '@
 $mapB64 = '@@MAP_B64@@'
+$questSha = '@@QUEST_SHA@@'
+$questB64 = '@@QUEST_B64@@'
 
 function Apply-Diff([byte[]]$img, [string]$diff) {
     foreach ($line in ($diff -split "`n")) {
@@ -204,9 +214,23 @@ if ((Get-Sha $mapBytes) -ne $mapSha) { Fail 'embedded MAP.DRK failed verificatio
 [IO.File]::WriteAllBytes($drakm, $newDrakm)
 [IO.File]::WriteAllBytes($resi, $newResi)
 [IO.File]::WriteAllBytes($map, $mapBytes)
+$questBytes = [Convert]::FromBase64String($questB64)
+if ((Get-Sha $questBytes) -ne $questSha) { Fail 'embedded QUEST.DRK failed verification.' }
+[IO.File]::WriteAllBytes((Join-Path $GamePath 'QUEST.DRK'), $questBytes)
+# CONFIG.TAT: 0xFFFF at +0x0A means "ask for video card every launch"; 4 = always VGA.
+# Only flip it if it is still the ask-me value - a player's own choice is left alone.
+$cfg = Join-Path $GamePath 'CONFIG.TAT'
+if (Test-Path $cfg) {
+    $cb = [IO.File]::ReadAllBytes($cfg)
+    if ($cb.Length -gt 0x0B -and $cb[0x0A] -eq 0xFF -and $cb[0x0B] -eq 0xFF) {
+        $cb[0x0A] = 4; $cb[0x0B] = 0; [IO.File]::WriteAllBytes($cfg, $cb)
+        Write-Host '  CONFIG.TAT    - video-card menu skipped (always VGA)'
+    }
+}
 Write-Host ''
 Write-Host 'Patched successfully:' -ForegroundColor Green
 Write-Host '  DRAKM.CC1     - compass, M-key world map, MP regen, shared XP, item names'
 Write-Host '  RESI_VGA.6C0  - readable spell font'
 Write-Host '  MAP.DRK       - world map image (new file)'
+Write-Host '  QUEST.DRK     - quest hints page for the H key (new file)'
 Write-Host 'Originals are in _backup\original. Uninstall:  install.ps1 -Restore'

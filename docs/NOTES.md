@@ -34,7 +34,10 @@
   damage * victim_XP_pool / victim_maxHP; monsters share the layout family - victim +0x18 dword =
   remaining XP pool, +0x51 = HP), +0x24/+0x25 sprite screen x/y (deployed), +0x36 HP-regen countdown,
   +0x42..+0x47 six stat bytes, **+0x4F max HP, +0x51 current HP** (also the alive check),
-  +0x52/+0x53 class-group pair (casters 2/2, others 4/4; +0x53 scales regen periods),
+  **+0x52 = highest level reached, +0x53 = CURRENT LEVEL** (earlier "class-group" label was wrong -
+  the 2/2 vs 4/4 pairs were simply levels; regen periods scale with LEVEL),
+  **+0x37 (&0x1F) -> DS:1BAE -> the TRUE class index 0..3** (0 fighter/amazon, 1 scout,
+  2 magician/sorceress, 3 priest/priestess - verified via the MP formula below),
   **+0x56 class/portrait id** — user's party: sorceress=4, amazon=5, priestess=6, scout=7, so
   **even id = caster** holds for this party. CAVEAT: the class-NAME table order (Fighter, Scout,
   Magician, Priest, Amazon, Scout, Sorceress, Priestess = ids 0..7 via ptr [0x6986]) does NOT match
@@ -88,6 +91,116 @@
   the row and is garbage in the original. Replaced with Latin letters by `mod_spellfont.py`.
 - Filename table: far ptrs at DS:1958 (index 16 = dataext.6in), VGA set; second set follows (floppy variant).
 - Dialogue: 0/1/2.7XT, u16be offset table, 5-byte record header, NUL-separated lines.
+
+## Leveling (research 2026-08-25, mod_levelup.py adds stat growth)
+- Level-up routine img 0xCBB0..0xCD25 (called from the XP-award path). Level from a geometric XP
+  threshold loop, **max level 0x18 = 24**.
+- **Max MP = DS:1BB7[class*2] + DS:1BB7[class*2+1] * level, engine clamp 254.** Verified exactly on
+  the user's party: fighter (3,2), scout (5,1), mage (16,11), priest (24,9).
+- **Max HP += maxHP/16 per level, engine clamp 250.** Current HP untouched here.
+- **Stock stats NEVER grow on level-up** - only the IMPROV spell handler (070E:0EB0, img 0x7F90,
+  reached via the spell-effect far-ptr table at DS:0B96) gives +1 to a rand(6) stat, unclamped.
+- mod_levelup splices the 7 bytes at img 0xCCD8 (les bx,[bp+6] / mov es:[bx+0x53],al) and applies a
+  4-class x 6-stat gain table x level-delta, clamp 99. Emulation-verified (unicorn): single level,
+  multi-level jump, clamp, no-op.
+
+## Copy protection (SOLVED - mod_noprotect.py)
+- Prompt strings are message-table entries: DS:2B36 "DRAKKHEN CODES", DS:2B3A "Line:", DS:2B3E "Word:".
+  They are NOT reachable by any static index - that is why an index scan finds nothing.
+- Dialog draw **0D7E:18B0** (pushes those three far ptrs). Protection routine **0D7E:19B1**
+  (random line/word via `div 0x19`, letter input loop, compare). Single caller = gate **0D7E:1B79**:
+  a 32-bit counter at **DS:1B1A/1B1C** increments once per call and fires the prompt when it equals
+  exactly **0x4C1 (1217)**; leading `ja/jae` tests make it a one-shot per session.
+  Companion flag DS:1B18 is written and never read.
+- **Fix: set the counter HIGH word (DS:1B1C) to 1.** First `ja done` then skips forever. Data only,
+  no code removed, 0 dead-space bytes. Counter is referenced by nothing else.
+
+## Video-card menu (SOLVED - mod_novideomenu.py, patches CONFIG.TAT not the game)
+- DRAKKHEN.COM is a menu shell shared with Infogrames' HOSTAGE (its strings are still inside).
+  It reads CONFIG.TAT to 0x1A50, then `cmp word cs:[0x1a5a],-1 / jne skip / call show_menu`.
+- **CONFIG.TAT+0x0A = chosen card** (0xFFFF = ask). Value is the MENU INDEX into the 5-word
+  availability list at CONFIG.TAT+0x0E = {0x0018 CGA, 0x00DA EGA, 0x013B Tandy, 0x0079 Hercules,
+  0x019C VGA} - each a byte offset to a driver/engine record. **VGA = 4.**
+  (Record indices 8/9 are NOT valid here: they give "insert disk 1" and an instant exit.)
+
+## Character creation / class templates
+- Creation routine img 0x10E70..0x10FCB builds a character from a **6-byte per-class template at
+  DS:1BBF** (`tmpl = 0x1BBF + (class & 0x7F)*6`):
+  cls0 Fighter 9,6,7,3,2,5 | cls1 Scout 10,8,7,3,2,7 | cls2 Magician 12,10,10,6,5,12 |
+  cls3 Priest 16,13,12,12,9,13 | cls4 Amazon 20,16,16,18,16,18 | cls5 Scout(f) 23,19,20,22,20,20 |
+  cls6 Sorceress 54,48,45,44,39,33 | cls7 Priestess 30,20,15,11,7,3
+  Each of the six stats (+0x42..+0x47) = template byte + rand(0..3); max HP (+0x4F) = 4*T + rand(4*T).
+  NOTE: these numbers do not look like plain "starting stats" - verify against a fresh character
+  before treating the table as authoritative class balance.
+- **Level-up stat growth: img 0x7F90 - `rand(6)` picks ONE of the six stats and `inc`s it**
+  (`mov ax,6; call rand; add bx,ax; inc es:[bx+0x42]`), then sets +0x51. There is NO per-class
+  growth table and no class branch at this site: growth is flat +1 to a RANDOM stat for everyone.
+  That is the hook point for class-dependent growth (weight the roll, or add +1 by class).
+
+## Quest / event progress (research 2026-08-24)
+Two counter arrays, both saved inside PERSO.SAV, both INCREMENTED (not set) as the party advances -
+so they are progress step counters, not booleans:
+- **DS:700C**, 0x40 bytes (save +0x6BC). Indexed `si*16 + di` -> si 0..3, di 0..15. Written at
+  img 0x17D31 `inc byte [bx+0x700C]`, taken when a context word `[bp-0x68] == 0x80`.
+  si is most likely the party-member index (4 of them); currently all zero in the user's save.
+- **DS:6F38**, 0xCC bytes (save +0x6FC) = **51 entries x 4 bytes**, values observed 0..4. Indexed
+  `si*4 + di`, written at img 0x17D66 `inc byte [bx+0x6F38]`. A far pointer to it is published to the
+  global at DS:704C (img 0x17F9E). si here ranges far wider than 4, so si = location/NPC id.
+- Both increments live in the **conversation/interaction handler** (img ~0x17CC0..0x17D8B): it builds
+  a string from the message table at [0x6D90], calls the dialogue routine (img 0x177E1), and on
+  result 1 credits the party (adds to [0x59B8]+0x10 dword) and bumps one of the two counters.
+- Consequence for a quest log: the game does NOT store objective text or a quest list. It stores
+  "how far along entity N is". A quest log would have to MAP counter values -> our own text.
+
+## Dialogue text files (0/1/2.7XT)
+- Text is stored with the HIGH BIT SET; `b & 0x7F` makes it plain English. Lines NUL-separated.
+- The prose is fully readable and quest-bearing, e.g. "The Master of Water is the Master of Tears",
+  "it will take you to NAKHTKHA. Hurry on!", "Gems are tears". So a quest log could quote the game's
+  own words rather than invent text.
+
+## Main quest (user-supplied walkthrough, 2026-08-24 - authoritative)
+Journal wording, wrapped to the 40-char dialogue width:
+   1. Talk to Prince Hordtkhen
+   2. Visit Princess Hordtkha
+   3. Return to Prince Hordtkhen
+   4. Find Prince Haaggkhen
+      (wall switch by the door, THEN the ?)
+   5. Assist Prince Naakhtkhen
+   6. Stop Princess Nakhatka
+   7. Follow Princess Haaggkha's trail
+   8. Kill Prince Hordtkhen
+   9. Return to Princess Haaggkha
+  10. Take the Tear of Hazhulkha
+  11. Kill Princess Nakhtkha
+  12. Kill Prince Haaggkhen
+  13. Kill Prince Hazhulkhen
+  14. Read the message in the sepulchers
+  15. Give the 8 tears to the dragons
+The list is LINEAR, so a journal only needs a CURRENT STEP number - it does not have to derive
+objectives from engine state.
+
+## Quest / event progress counters (research 2026-08-24)
+Two arrays, both inside PERSO.SAV, both INCREMENTED as the party advances (progress counters, not
+booleans):
+- **DS:700C**, 0x40 B (save +0x6BC), indexed `si*16 + di`, si 0..3 - likely per party member.
+  Written img 0x17D31 when a context word `[bp-0x68] == 0x80`. All zero in the user's save.
+- **DS:6F38**, 0xCC B (save +0x6FC) = 51 entries x 4 B, indexed `si*4 + di`; written img 0x17D66.
+  Far pointer published to DS:704C (img 0x17F9E). **Only byte 0 of each entry is ever non-zero** in
+  a real save, and non-zero entries come in CONSECUTIVE CLUSTERS (observed: 4-8, 17/18/20, 29-31,
+  34-36/38, 43-45, 48-50; values 1..4) - consistent with one cluster per location, one counter per
+  NPC/topic within it.
+- Both increments live in the conversation/interaction handler (img ~0x17CC0..0x17D8B): build the
+  line from the [0x6D90] message table, call the dialogue routine (img 0x177E1), and on result 1
+  credit XP and bump a counter.
+- **GAP**: counter index -> quest step is NOT established and cannot be derived statically. Closing
+  it needs snapshots of DS:6F38 at known walkthrough points (memprobe.py while the user plays).
+
+## Dialogue text (0/1/2.7XT) - editable
+- LOOSE, UNCOMPRESSED files. Chars stored with the HIGH BIT SET (`b & 0x7F` decodes), NUL-separated.
+- Text may be rewritten in place at the SAME length freely; changing a line's length also requires
+  rebuilding the file's offset table.
+- **Wrap limit 40 chars**: the line builder 0A4A:033D fills DS:5426 with stride 0x28, ~4-5 lines.
+- Engine string draw: `lcall 0A4A:0241 (far ptr, x, y)`.
 
 ## Message / name tables (all far-ptr tables in DGROUP; bases handed out at img 0x3BA1)
 - **DS:2A02**: 88 entries. 0-3 level-up ('Ability', 'gets', ' Hit points'), 4-16 status msgs,
