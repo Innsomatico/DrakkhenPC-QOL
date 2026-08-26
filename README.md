@@ -22,7 +22,11 @@ dramatically more playable without changing its character.
 
 ## Install
 
-Two installers, **identical behavior** — pick whichever you trust more:
+Two installers, **identical behavior** — pick whichever you trust more. Both let you **choose
+which mods to install**: PowerShell shows a checkbox dialog (with Check-all); Python shows a
+numbered checklist. Or skip the question entirely with `-All` / `--all`, or pick on the command
+line with `-Mods compass,map,bow` / `--mods compass,map,bow` (`--list` shows the keys).
+Dependencies are handled for you (e.g. the world map needs the compass hook).
 
 **PowerShell** (no dependencies on any Windows machine):
 

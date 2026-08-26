@@ -25,6 +25,8 @@ DIFF_RESI  = '''@@RDIFF_LINES@@'''
 MAP_B64    = '@@MAP_B64@@'
 QUEST_SHA  = '@@QUEST_SHA@@'
 QUEST_B64  = '@@QUEST_B64@@'
+FRAGS   = __import__('json').loads('''@@FRAGS_JSON@@''')
+MODDEFS = __import__('json').loads('''@@MODDEFS_JSON@@''')
 
 
 # ---- BPE codec (mirrors the reference drakpack.py) --------------------------
@@ -109,11 +111,75 @@ def fail(msg):
     print('ERROR: ' + msg); sys.exit(1)
 
 
+def apply_fragments(chunk1, selected):
+    c = bytearray(chunk1)
+    h = list(struct.unpack_from('<14H', c))
+    ro, nrel, hdr = h[12], h[3], h[4] * 16
+    for name in FRAGS['order']:
+        if name not in selected:
+            continue
+        for off, hx in FRAGS['frags'][name]['writes']:
+            b = bytes.fromhex(hx)
+            c[off:off + len(b)] = b
+    reps, drops, adds = {}, set(), []
+    for name in FRAGS['order']:
+        if name not in selected:
+            continue
+        f = FRAGS['frags'][name]
+        for old, off, seg in f['rrep']:
+            reps[old] = (off, seg)
+        drops.update(f['rdrop'])
+        adds += [(off, seg) for off, seg in f['radd']]
+    entries = []
+    for i in range(nrel):
+        off, seg = struct.unpack_from('<HH', c, ro + 4 * i)
+        lin = seg * 16 + off
+        if lin in drops:
+            continue
+        if lin in reps:
+            off, seg = reps[lin]
+        entries.append((off, seg))
+    entries += adds
+    if ro + len(entries) * 4 > hdr:
+        fail('relocation table overflow - report this selection as a bug')
+    for k, (off, seg) in enumerate(entries):
+        struct.pack_into('<HH', c, ro + 4 * k, off, seg)
+    h[3] = len(entries)
+    struct.pack_into('<14H', c, 0, *h)
+    return bytes(c)
+
+
+def ask_selection():
+    print()
+    print('Select mods to install (all are ON by default):')
+    state = {k: True for k, _, _ in MODDEFS}
+    while True:
+        for n, (k, label, deps) in enumerate(MODDEFS, 1):
+            print(' %2d. [%s] %s' % (n, 'X' if state[k] else ' ', label))
+        ans = input('Toggle by number, A = all on, N = all off, ENTER = install checked: ').strip().lower()
+        if ans == '':
+            return {k for k, v in state.items() if v}
+        if ans == 'a':
+            state = {k: True for k in state}
+        elif ans == 'n':
+            state = {k: False for k in state}
+        elif ans.isdigit() and 1 <= int(ans) <= len(MODDEFS):
+            k = MODDEFS[int(ans) - 1][0]
+            state[k] = not state[k]
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument('gamepath', nargs='?', default=os.path.dirname(os.path.abspath(__file__)))
     ap.add_argument('--restore', action='store_true', help='undo the patch from the backup')
+    ap.add_argument('--all', action='store_true', help='install every mod without asking')
+    ap.add_argument('--mods', help='comma-separated mod keys to install (see --list)')
+    ap.add_argument('--list', action='store_true', help='list selectable mods and exit')
     a = ap.parse_args()
+    if a.list:
+        for k, label, deps in MODDEFS:
+            print('%-10s %s%s' % (k, label, (' (requires: %s)' % ','.join(deps)) if deps else ''))
+        return
     g = a.gamepath
     drakm, resi = os.path.join(g, 'DRAKM.CC1'), os.path.join(g, 'RESI_VGA.6C0')
     mapf = os.path.join(g, 'MAP.DRK')
@@ -147,6 +213,31 @@ def main():
                 open(cfg, 'wb').write(bytes(cb)); print('restored CONFIG.TAT video-card prompt')
         print('Game restored to stock. Save files were not touched.')
         return
+
+    allkeys = [k for k, _, _ in MODDEFS]
+    if a.mods:
+        sel = set(x.strip() for x in a.mods.split(',') if x.strip())
+        bad = sel - set(allkeys)
+        if bad:
+            fail('unknown mod keys: %s (use --list)' % ', '.join(sorted(bad)))
+    elif a.all:
+        sel = set(allkeys)
+    else:
+        sel = ask_selection()
+    # dependency closure
+    changed = True
+    while changed:
+        changed = False
+        for k, _, deps in MODDEFS:
+            if k in sel:
+                for dep in deps:
+                    if dep not in sel:
+                        sel.add(dep); changed = True
+                        print('note: %s requires %s - enabled automatically' % (k, dep))
+    if not sel:
+        print('nothing selected - nothing to do.'); return
+    full = sel == set(allkeys)
+    print('installing: ' + ', '.join(k for k in allkeys if k in sel))
 
     db, rb = open(drakm, 'rb').read(), open(resi, 'rb').read()
     if sha(db) == MOD_DRAKM_SHA and sha(rb) == MOD_RESI_SHA:
@@ -187,32 +278,39 @@ def main():
         c1 = bytearray(chunks[1])
         c1[STEAM_FIX_OFF] = STEAM_FIX_VAL    # normalize Steam's byte back to stock
         chunks[1] = bytes(c1)
-    chunks[1] = apply_diff(chunks[1], DIFF_DRAKM)
+    engine_sel = set(FRAGS['order']) & sel
+    chunks[1] = apply_fragments(chunks[1], engine_sel)
     new_drakm = pack_container(chunks)
-    if sha(new_drakm) != MOD_DRAKM_SHA:
+    if full and sha(new_drakm) != MOD_DRAKM_SHA:
         fail('rebuilt DRAKM.CC1 failed verification - nothing was changed.')
+    if not full:
+        print('note: partial selection - engine verified structurally (full-set hash check skipped).')
 
-    print('decoding RESI_VGA.6C0 ...')
-    rdec = apply_diff(bpe_decode(rb, 8)[0], DIFF_RESI)
-    body = encode_raw(rdec)
-    new_resi = struct.pack('>II', len(body), len(rdec)) + body
-    if sha(new_resi) != MOD_RESI_SHA:
-        fail('rebuilt RESI_VGA.6C0 failed verification - nothing was changed.')
-
-    map_bytes = base64.b64decode(MAP_B64)
-    if sha(map_bytes) != MAP_SHA:
-        fail('embedded MAP.DRK failed verification.')
+    new_resi = None
+    if 'spellfont' in sel:
+        print('decoding RESI_VGA.6C0 ...')
+        rdec = apply_diff(bpe_decode(rb, 8)[0], DIFF_RESI)
+        body = encode_raw(rdec)
+        new_resi = struct.pack('>II', len(body), len(rdec)) + body
+        if sha(new_resi) != MOD_RESI_SHA:
+            fail('rebuilt RESI_VGA.6C0 failed verification - nothing was changed.')
 
     open(drakm, 'wb').write(new_drakm)
-    open(resi, 'wb').write(new_resi)
-    open(mapf, 'wb').write(map_bytes)
-    quest_bytes = base64.b64decode(QUEST_B64)
-    if sha(quest_bytes) != QUEST_SHA:
-        fail('embedded QUEST.DRK failed verification.')
-    open(os.path.join(g, 'QUEST.DRK'), 'wb').write(quest_bytes)
+    if new_resi is not None:
+        open(resi, 'wb').write(new_resi)
+    if 'map' in sel:
+        map_bytes = base64.b64decode(MAP_B64)
+        if sha(map_bytes) != MAP_SHA:
+            fail('embedded MAP.DRK failed verification.')
+        open(mapf, 'wb').write(map_bytes)
+    if 'hints' in sel:
+        quest_bytes = base64.b64decode(QUEST_B64)
+        if sha(quest_bytes) != QUEST_SHA:
+            fail('embedded QUEST.DRK failed verification.')
+        open(os.path.join(g, 'QUEST.DRK'), 'wb').write(quest_bytes)
     # CONFIG.TAT: 0xFFFF at +0x0A = "ask for video card"; 4 = always VGA. Only flip the ask-me value.
     cfg = os.path.join(g, 'CONFIG.TAT')
-    if os.path.exists(cfg):
+    if 'vga' in sel and os.path.exists(cfg):
         cb = bytearray(open(cfg, 'rb').read())
         if len(cb) > 0x0B and cb[0x0A] == 0xFF and cb[0x0B] == 0xFF:
             cb[0x0A:0x0C] = bytes([4, 0])

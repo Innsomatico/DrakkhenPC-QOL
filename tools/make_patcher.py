@@ -65,7 +65,25 @@ def main():
     body = drakpack.bpe_encode_raw(bytes(rp))
     assert struct.pack('>II', len(body), len(rp)) + body == mod_resi, 'resi roundtrip failed'
 
+    import json
+    frag = json.load(open(os.path.join(HERE, 'fragments.json')))
+    # user-facing mod list: key, label, dependencies. Engine frags by key; file mods by kind.
+    moddefs = [
+        ['compass',   'Compass in the 3D view', []],
+        ['map',       'World map on the M key', ['compass']],
+        ['hints',     'Quest hints on the H key', ['map', 'noprotect']],
+        ['spellfont', 'Readable spell font (English letters)', []],
+        ['itemname',  'Item identification (ring/sceptre/phial names)', []],
+        ['ring',      'Working ring & sceptre effects', ['noprotect']],
+        ['levelup',   'Class-based stat growth on level-up', []],
+        ['partyxp',   'Party-shared kill XP', []],
+        ['bow',       'Bow buff (power 12, renamed)', []],
+        ['noprotect', 'Remove the copy-protection prompt', []],
+        ['vga',       'Skip the video-card menu (always VGA)', []],
+    ]
     subst = {
+        'FRAGS_JSON':      json.dumps(frag, separators=(',', ':')),
+        'MODDEFS_JSON':    json.dumps(moddefs, separators=(',', ':')),
         'STOCK_DRAKM_SHA': sha(os.path.join(GAME, '_backup', 'original', 'DRAKM.CC1')),
         # Steam ships DRAKM.CC1 = GOG stock with ONE byte changed (their copy-protection skip:
         # jne->jmp at decoded-chunk offset 0x11D87). The installers normalize it back to stock.

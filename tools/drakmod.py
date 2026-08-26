@@ -73,6 +73,7 @@ class Builder:
             off, seg = struct.unpack_from('<HH', self.exe, self.ro + 4*i)
             self.relocs[seg*16 + off] = i
         self.added = []
+        self.repointed = []            # (old_linear, new_off, new_seg) - journaled for fragments
         self.allocated = []            # (linear start, size) of every alloc()
         self.free = [[DGROUP*16 + o, n, d] for o, n, d in SPACE]
         self.code_free = [[o, n, d] for o, n, d in CODE_SPACE]
@@ -142,6 +143,7 @@ class Builder:
         assert i is not None, 'no existing relocation at %#x' % old_lin
         struct.pack_into('<HH', self.exe, self.ro + 4*i, off, seg)
         self.relocs[seg*16 + off] = i
+        self.repointed.append((old_lin, off, seg))
 
     def splice_call(self, seg, off, target_seg, target_off, expect=None):
         """Overwrite 5 bytes with `lcall target`, handling the site's existing relocation."""
@@ -204,11 +206,41 @@ def assemble(src, org):
     return bytes(Ks(KS_ARCH_X86, KS_MODE_16).asm(chr(10).join(lines), org)[0])
 
 def build(mods):
+    """mods: list of (name, apply_fn). Applies all, saves, and journals each mod's exact
+    contribution (image writes, relocation adds, relocation drops) to fragments.json so the
+    distributable installer can apply any user-selected subset."""
+    import json
     b = Builder()
-    for m in mods:
+    frags = {}
+    order = []
+    for name, m in mods:
+        img_before = bytes(b.img)
+        relocs_before = set(b.relocs.keys())
+        added_before = len(b.added)
+        rep_before = len(b.repointed)
         m(b)
+        # image writes as runs (chunk-relative: header + image offset)
+        d = [i for i in range(len(b.img)) if b.img[i] != img_before[i]]
+        runs = []
+        if d:
+            s0 = p0 = d[0]
+            for i in d[1:]:
+                if i - p0 > 8:
+                    runs.append((s0, p0 + 1)); s0 = i
+                p0 = i
+            runs.append((s0, p0 + 1))
+        frags[name] = {
+            'writes': [[b.hdr + s0, bytes(b.img[s0:e0]).hex()] for s0, e0 in runs],
+            'radd':   [[off, seg] for off, seg in b.added[added_before:]],
+            'rrep':   [[o, off, seg] for o, off, seg in b.repointed[rep_before:]],
+            'rdrop':  sorted((relocs_before - set(b.relocs.keys()))
+                             - {o for o, _, _ in b.repointed[rep_before:]}),
+        }
+        order.append(name)
     p = b.save()
-    print('built %s  (%d mods, %d B data dead space + %d B code dead space left)'
+    json.dump({'order': order, 'frags': frags},
+              open(os.path.join(HERE, 'fragments.json'), 'w'), indent=0)
+    print('built %s  (%d mods, %d B data dead space + %d B code dead space left; fragments.json written)'
           % (os.path.basename(p), len(mods), b.remaining(), b.remaining_code()))
     return p
 
@@ -217,8 +249,11 @@ if __name__ == '__main__':
     import mod_spellfont, mod_novideomenu
     # mod_regen is DROPPED (user's call, 2026-08-23): a crash on packing characters ended it.
     # The mod file and the research in NOTES.md/ROADMAP.md remain if it is ever revisited.
-    build([mod_compass.apply, mod_map.apply,
-           mod_partyxp.apply, mod_itemname.apply, mod_bow.apply, mod_noprotect.apply, mod_journal.apply, mod_levelup.apply, mod_ring.apply])
+    build([('compass', mod_compass.apply), ('map', mod_map.apply),
+           ('partyxp', mod_partyxp.apply), ('itemname', mod_itemname.apply),
+           ('bow', mod_bow.apply), ('noprotect', mod_noprotect.apply),
+           ('hints', mod_journal.apply), ('levelup', mod_levelup.apply),
+           ('ring', mod_ring.apply)])
     # Data-only mods: these patch loose game files, not the engine, so they cost no dead space.
     orig = os.path.join(GAME, '_backup', 'original')
     mod_spellfont.apply_data(orig, GAME)

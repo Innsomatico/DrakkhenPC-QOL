@@ -2,7 +2,9 @@
 # Usage:  powershell -ExecutionPolicy Bypass -File install.ps1 [-GamePath <dir>] [-Restore]
 param(
     [string]$GamePath = $PSScriptRoot,
-    [switch]$Restore
+    [switch]$Restore,
+    [switch]$All,
+    [string]$Mods
 )
 $ErrorActionPreference = 'Stop'
 
@@ -154,6 +156,82 @@ $diffResi = @'
 $mapB64 = '@@MAP_B64@@'
 $questSha = '@@QUEST_SHA@@'
 $questB64 = '@@QUEST_B64@@'
+$frags   = '@@FRAGS_JSON@@' | ConvertFrom-Json
+$moddefs = '@@MODDEFS_JSON@@' | ConvertFrom-Json
+
+function Ask-Selection {
+    Add-Type -AssemblyName System.Windows.Forms
+    Add-Type -AssemblyName System.Drawing
+    $form = New-Object Windows.Forms.Form
+    $form.Text = 'Drakkhen QOL - choose your mods'
+    $form.Size = New-Object Drawing.Size(430, (120 + 26 * ($moddefs.Count + 1)))
+    $form.FormBorderStyle = 'FixedDialog'; $form.MaximizeBox = $false
+    $chkAll = New-Object Windows.Forms.CheckBox
+    $chkAll.Text = 'Check all'; $chkAll.Checked = $true
+    $chkAll.Location = New-Object Drawing.Point(15, 12)
+    $chkAll.Width = 380; $chkAll.Font = New-Object Drawing.Font($chkAll.Font, [Drawing.FontStyle]::Bold)
+    $form.Controls.Add($chkAll)
+    $boxes = @{}
+    $y = 42
+    foreach ($m in $moddefs) {
+        $cb = New-Object Windows.Forms.CheckBox
+        $cb.Text = $m[1]; $cb.Checked = $true
+        $cb.Location = New-Object Drawing.Point(30, $y); $cb.Width = 370
+        $form.Controls.Add($cb); $boxes[$m[0]] = $cb; $y += 26
+    }
+    $chkAll.Add_CheckedChanged({ foreach ($cb in $boxes.Values) { $cb.Checked = $chkAll.Checked } })
+    $ok = New-Object Windows.Forms.Button
+    $ok.Text = 'Install'; $ok.DialogResult = 'OK'
+    $ok.Location = New-Object Drawing.Point(230, ($y + 8))
+    $cancel = New-Object Windows.Forms.Button
+    $cancel.Text = 'Cancel'; $cancel.DialogResult = 'Cancel'
+    $cancel.Location = New-Object Drawing.Point(315, ($y + 8))
+    $form.Controls.Add($ok); $form.Controls.Add($cancel)
+    $form.AcceptButton = $ok; $form.CancelButton = $cancel
+    if ($form.ShowDialog() -ne 'OK') { Write-Host 'cancelled - nothing was changed.'; exit 0 }
+    $sel = New-Object System.Collections.Generic.HashSet[string]
+    foreach ($k in $boxes.Keys) { if ($boxes[$k].Checked) { [void]$sel.Add($k) } }
+    return $sel
+}
+
+function Apply-Fragments([byte[]]$c, $selected) {
+    $ro = [BitConverter]::ToUInt16($c, 24); $nrel = [BitConverter]::ToUInt16($c, 6)
+    $hdr = [BitConverter]::ToUInt16($c, 8) * 16
+    foreach ($name in $frags.order) {
+        if (-not $selected.Contains($name)) { continue }
+        foreach ($w in $frags.frags.$name.writes) {
+            $off = [int]$w[0]; $hex = $w[1]
+            for ($i = 0; $i -lt $hex.Length; $i += 2) {
+                $c[$off + ($i / 2)] = [Convert]::ToByte($hex.Substring($i, 2), 16)
+            }
+        }
+    }
+    $reps = @{}; $drops = New-Object System.Collections.Generic.HashSet[int]; $adds = @()
+    foreach ($name in $frags.order) {
+        if (-not $selected.Contains($name)) { continue }
+        $f = $frags.frags.$name
+        foreach ($r in $f.rrep)  { $reps[[int]$r[0]] = @([int]$r[1], [int]$r[2]) }
+        foreach ($x in $f.rdrop) { [void]$drops.Add([int]$x) }
+        foreach ($a in $f.radd)  { $adds += , @([int]$a[0], [int]$a[1]) }
+    }
+    $entries = @()
+    for ($i = 0; $i -lt $nrel; $i++) {
+        $off = [BitConverter]::ToUInt16($c, $ro + 4 * $i)
+        $seg = [BitConverter]::ToUInt16($c, $ro + 4 * $i + 2)
+        $lin = $seg * 16 + $off
+        if ($drops.Contains($lin)) { continue }
+        if ($reps.ContainsKey($lin)) { $off = $reps[$lin][0]; $seg = $reps[$lin][1] }
+        $entries += , @($off, $seg)
+    }
+    $entries += $adds
+    if ($ro + $entries.Count * 4 -gt $hdr) { Fail 'relocation table overflow - report this selection as a bug' }
+    for ($k = 0; $k -lt $entries.Count; $k++) {
+        [BitConverter]::GetBytes([uint16]$entries[$k][0]).CopyTo($c, $ro + 4 * $k)
+        [BitConverter]::GetBytes([uint16]$entries[$k][1]).CopyTo($c, $ro + 4 * $k + 2)
+    }
+    [BitConverter]::GetBytes([uint16]$entries.Count).CopyTo($c, 6)
+    return $c
+}
 
 function Apply-Diff([byte[]]$img, [string]$diff) {
     foreach ($line in ($diff -split "`n")) {
@@ -164,6 +242,36 @@ function Apply-Diff([byte[]]$img, [string]$diff) {
         }
     }
 }
+
+# ---- mod selection ---------------------------------------------------------
+$allkeys = @($moddefs | ForEach-Object { $_[0] })
+if ($Mods) {
+    $sel = New-Object System.Collections.Generic.HashSet[string]
+    foreach ($k in $Mods.Split(',')) { [void]$sel.Add($k.Trim()) }
+    foreach ($k in $sel) { if ($allkeys -notcontains $k) { Fail "unknown mod key '$k'" } }
+} elseif ($All) {
+    $sel = New-Object System.Collections.Generic.HashSet[string]
+    foreach ($k in $allkeys) { [void]$sel.Add($k) }
+} else {
+    $sel = Ask-Selection
+}
+$changed = $true
+while ($changed) {
+    $changed = $false
+    foreach ($m in $moddefs) {
+        if ($sel.Contains($m[0])) {
+            foreach ($dep in $m[2]) {
+                if (-not $sel.Contains($dep)) {
+                    [void]$sel.Add($dep); $changed = $true
+                    Write-Host "note: $($m[0]) requires $dep - enabled automatically"
+                }
+            }
+        }
+    }
+}
+if ($sel.Count -eq 0) { Write-Host 'nothing selected - nothing to do.'; exit 0 }
+$fullSel = ($sel.Count -eq $allkeys.Count)
+Write-Host ('installing: ' + (($allkeys | Where-Object { $sel.Contains($_) }) -join ', '))
 
 # ---- verify the stock files ------------------------------------------------
 $drakmBytes = [IO.File]::ReadAllBytes($drakm)
@@ -211,39 +319,46 @@ foreach ($f in @{ 'DRAKM.CC1' = $drakmBytes; 'RESI_VGA.6C0' = $resiBytes }.GetEn
 Write-Host 'decoding DRAKM.CC1 ...'
 $chunks = [DrakPack]::UnpackContainer($drakmBytes)
 if ($steam) { $chunks[1][0x11D87] = 0x75 }   # normalize Steam's protection byte back to stock
-Apply-Diff $chunks[1] $diffDrakm
+$chunks[1] = Apply-Fragments $chunks[1] $sel
 $newDrakm = [DrakPack]::PackContainer($chunks)
-if ((Get-Sha $newDrakm) -ne $modDrakmSha) { Fail 'rebuilt DRAKM.CC1 failed verification - nothing was changed.' }
+if ($fullSel -and (Get-Sha $newDrakm) -ne $modDrakmSha) { Fail 'rebuilt DRAKM.CC1 failed verification - nothing was changed.' }
+if (-not $fullSel) { Write-Host 'note: partial selection - engine verified structurally (full-set hash check skipped).' }
 
 # ---- rebuild RESI_VGA.6C0 --------------------------------------------------
-Write-Host 'decoding RESI_VGA.6C0 ...'
-$rdec = [DrakPack]::Decode($resiBytes, 8)
-Apply-Diff $rdec $diffResi
-$rbody = [DrakPack]::EncodeRaw($rdec)
-$ms = New-Object IO.MemoryStream
-foreach ($v in @($rbody.Length, $rdec.Length)) {
-    $ms.WriteByte([byte](($v -shr 24) -band 0xFF)); $ms.WriteByte([byte](($v -shr 16) -band 0xFF))
-    $ms.WriteByte([byte](($v -shr 8) -band 0xFF));  $ms.WriteByte([byte]($v -band 0xFF))
+$newResi = $null
+if ($sel.Contains('spellfont')) {
+    Write-Host 'decoding RESI_VGA.6C0 ...'
+    $rdec = [DrakPack]::Decode($resiBytes, 8)
+    Apply-Diff $rdec $diffResi
+    $rbody = [DrakPack]::EncodeRaw($rdec)
+    $ms = New-Object IO.MemoryStream
+    foreach ($v in @($rbody.Length, $rdec.Length)) {
+        $ms.WriteByte([byte](($v -shr 24) -band 0xFF)); $ms.WriteByte([byte](($v -shr 16) -band 0xFF))
+        $ms.WriteByte([byte](($v -shr 8) -band 0xFF));  $ms.WriteByte([byte]($v -band 0xFF))
+    }
+    $ms.Write($rbody, 0, $rbody.Length)
+    $newResi = $ms.ToArray()
+    if ((Get-Sha $newResi) -ne $modResiSha) { Fail 'rebuilt RESI_VGA.6C0 failed verification - nothing was changed.' }
 }
-$ms.Write($rbody, 0, $rbody.Length)
-$newResi = $ms.ToArray()
-if ((Get-Sha $newResi) -ne $modResiSha) { Fail 'rebuilt RESI_VGA.6C0 failed verification - nothing was changed.' }
 
 # ---- MAP.DRK ---------------------------------------------------------------
-$mapBytes = [Convert]::FromBase64String($mapB64)
-if ((Get-Sha $mapBytes) -ne $mapSha) { Fail 'embedded MAP.DRK failed verification.' }
-
 # ---- commit (only after every verification passed) -------------------------
 [IO.File]::WriteAllBytes($drakm, $newDrakm)
-[IO.File]::WriteAllBytes($resi, $newResi)
-[IO.File]::WriteAllBytes($map, $mapBytes)
-$questBytes = [Convert]::FromBase64String($questB64)
-if ((Get-Sha $questBytes) -ne $questSha) { Fail 'embedded QUEST.DRK failed verification.' }
-[IO.File]::WriteAllBytes((Join-Path $GamePath 'QUEST.DRK'), $questBytes)
+if ($null -ne $newResi) { [IO.File]::WriteAllBytes($resi, $newResi) }
+if ($sel.Contains('map')) {
+    $mapBytes = [Convert]::FromBase64String($mapB64)
+    if ((Get-Sha $mapBytes) -ne $mapSha) { Fail 'embedded MAP.DRK failed verification.' }
+    [IO.File]::WriteAllBytes($map, $mapBytes)
+}
+if ($sel.Contains('hints')) {
+    $questBytes = [Convert]::FromBase64String($questB64)
+    if ((Get-Sha $questBytes) -ne $questSha) { Fail 'embedded QUEST.DRK failed verification.' }
+    [IO.File]::WriteAllBytes((Join-Path $GamePath 'QUEST.DRK'), $questBytes)
+}
 # CONFIG.TAT: 0xFFFF at +0x0A means "ask for video card every launch"; 4 = always VGA.
 # Only flip it if it is still the ask-me value - a player's own choice is left alone.
 $cfg = Join-Path $GamePath 'CONFIG.TAT'
-if (Test-Path $cfg) {
+if ($sel.Contains('vga') -and (Test-Path $cfg)) {
     $cb = [IO.File]::ReadAllBytes($cfg)
     if ($cb.Length -gt 0x0B -and $cb[0x0A] -eq 0xFF -and $cb[0x0B] -eq 0xFF) {
         $cb[0x0A] = 4; $cb[0x0B] = 0; [IO.File]::WriteAllBytes($cfg, $cb)

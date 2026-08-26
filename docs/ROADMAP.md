@@ -150,10 +150,17 @@ User confirmed Recuperation (regen doubles, shows in ability list after sheet re
 Invisibility in play. Sheet refresh on equip is a known cosmetic lag. Stat+2 rings from the SNES
 guide: judged not worth the code (user's call).
 
-### 16. Starting equipment (save-side) — **DONE for the user's party** (2026-08-25)
-User's fresh party edited: SCOUT +bow, MAGICIAN +RESTORE ring. NOTE: this is a SAVE edit - other
-players' created characters get stock gear. A universal version means patching the creation
-program (DRAKTJ.CC1) - parked; see also 17.
+### 16. Starting equipment — save edit was a STOPGAP, the real feature is a DRAKTJ patch
+USER CORRECTION (2026-08-25): the ask was always to edit the CREATION CODE so new characters are
+born with the gear - NOT to edit saves. The save edit on the user's own party stands as their
+local state only. Research so far on DRAKTJ.CC1 (the character-creation program, own MZ container,
+DGROUP layout differs from DRAKM): save writer/loader found (records at DS:4BBE, same XOR+checksum
+format); record-init routine at img 0x1339x-0x1348x (writes slots 0/1 spell-book entries from a
+creation-spec struct, stat rolls from template DS:1A73, HP/level init identical in shape to
+DRAKM's); give-item helper at img 0x0DB12 (+0x64 weapons area) / 0x0DB9C (+0x94 items area);
+the per-class wearable-gear grant (slots 2-4) is in the per-class branches from img ~0x134F2 -
+NEXT STEP: finish tracing those branches, then patch scout->+bow, mage->+RESTORE ring there, and
+add DRAKTJ.CC1 to the build + installers as a fourth patched file.
 
 ### 17. Steam version support — **DONE** (2026-08-25)
 The Steam release = GOG stock with exactly ONE byte changed per engine (.CC1): Steam's own
@@ -162,6 +169,19 @@ stock. Both installers now: auto-detect the Steam `game/` subfolder layout, reco
 DRAKM hash, normalize that byte back to stock before applying the diff (output byte-identical to
 the GOG reference), and restore returns the STEAM original. Unknown-hash failures now print the
 found vs known hashes and where to report them. Verified on the user's real Steam install.
+
+### 18. Mod-selection installer — **DONE** (2026-08-25)
+Both installers now install a user-chosen SUBSET of mods. Build side: drakmod.build() journals each
+mod's exact contribution (image write-runs, relocation adds/drops/repoints) to fragments.json;
+make_patcher embeds it plus a moddef list (key, label, deps). Install side: fragment applicator +
+runtime relocation-table rebuild (stock entries minus drops, with repoints, plus adds in canonical
+order). Full selection is verified byte-identical to the reference build; partial selections are
+structurally verified (hash check inherently unavailable for 2^n combos). Deps auto-enabled:
+map->compass, hints->map+noprotect, ring->noprotect. UI: PowerShell = WinForms checkbox dialog with
+Check-all (plus -All / -Mods key,list); Python = numbered console checklist (plus --all / --mods /
+--list). Verified: full --all == reference on both; PS and PY partial builds byte-identical; a
+partial build (compass,map,bow,vga) boot-tested in game - and the user independently confirmed the
+unselected itemname mod was absent, i.e. selection observably works.
 
 ---
 
