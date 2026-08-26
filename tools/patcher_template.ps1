@@ -13,6 +13,11 @@ function Get-Sha([byte[]]$b) {
 function Fail($msg) { Write-Host "ERROR: $msg" -ForegroundColor Red; exit 1 }
 
 # ---- locate the game -------------------------------------------------------
+if (-not (Test-Path (Join-Path $GamePath 'DRAKM.CC1')) -and
+    (Test-Path (Join-Path $GamePath 'game\DRAKM.CC1'))) {
+    $GamePath = Join-Path $GamePath 'game'      # Steam layout: files live in a game/ subfolder
+    Write-Host "using Steam layout: game files in '$GamePath'"
+}
 if (-not (Test-Path (Join-Path $GamePath 'DRAKM.CC1'))) {
     Fail "DRAKM.CC1 not found in '$GamePath'. Put install.ps1 in the Drakkhen game folder, or pass -GamePath."
 }
@@ -135,6 +140,7 @@ public static class DrakPack {
 
 # ---- embedded patch data ---------------------------------------------------
 $stockDrakmSha = '@@STOCK_DRAKM_SHA@@'
+$steamDrakmSha = '@@STEAM_DRAKM_SHA@@'   # GOG stock + Steam's own 1-byte protection skip
 $stockResiSha  = '@@STOCK_RESI_SHA@@'
 $modDrakmSha   = '@@MOD_DRAKM_SHA@@'
 $modResiSha    = '@@MOD_RESI_SHA@@'
@@ -175,8 +181,24 @@ if ($rSha -ne $stockResiSha -and (Test-Path (Join-Path $bak 'RESI_VGA.6C0'))) {
     $resiBytes = [IO.File]::ReadAllBytes((Join-Path $bak 'RESI_VGA.6C0')); $rSha = Get-Sha $resiBytes
     Write-Host 'RESI_VGA.6C0 is modified; using the backup copy as the stock source.'
 }
-if ($dSha -ne $stockDrakmSha) { Fail "DRAKM.CC1 is not the stock US GOG version (SHA256 $dSha). This patch supports only that version; nothing was changed." }
-if ($rSha -ne $stockResiSha)  { Fail "RESI_VGA.6C0 is not the stock US GOG version (SHA256 $rSha). Nothing was changed." }
+$steam = ($dSha -eq $steamDrakmSha)
+if ($steam) { Write-Host 'Steam release detected (DRAKM.CC1 carries the Steam 1-byte protection skip).' }
+if (-not $steam -and $dSha -ne $stockDrakmSha) {
+    Fail ("DRAKM.CC1 is not a known US release.`n" +
+          "  yours:       $dSha ($($drakmBytes.Length) bytes)`n" +
+          "  known GOG:   $stockDrakmSha`n" +
+          "  known Steam: $steamDrakmSha`n" +
+          "If this is an unmodified US GOG or Steam install, please report these lines at`n" +
+          "https://github.com/Innsomatico/DrakkhenPC-QOL/issues - the hash is what we need.`n" +
+          "Nothing was changed.")
+}
+if ($rSha -ne $stockResiSha) {
+    Fail ("RESI_VGA.6C0 is not the stock US version.`n" +
+          "  yours: $rSha ($($resiBytes.Length) bytes)`n" +
+          "  known: $stockResiSha`n" +
+          "Please report these lines at https://github.com/Innsomatico/DrakkhenPC-QOL/issues.`n" +
+          "Nothing was changed.")
+}
 
 # ---- back up ---------------------------------------------------------------
 New-Item -ItemType Directory -Force $bak | Out-Null
@@ -188,6 +210,7 @@ foreach ($f in @{ 'DRAKM.CC1' = $drakmBytes; 'RESI_VGA.6C0' = $resiBytes }.GetEn
 # ---- rebuild DRAKM.CC1 -----------------------------------------------------
 Write-Host 'decoding DRAKM.CC1 ...'
 $chunks = [DrakPack]::UnpackContainer($drakmBytes)
+if ($steam) { $chunks[1][0x11D87] = 0x75 }   # normalize Steam's protection byte back to stock
 Apply-Diff $chunks[1] $diffDrakm
 $newDrakm = [DrakPack]::PackContainer($chunks)
 if ((Get-Sha $newDrakm) -ne $modDrakmSha) { Fail 'rebuilt DRAKM.CC1 failed verification - nothing was changed.' }
@@ -229,7 +252,7 @@ if (Test-Path $cfg) {
 }
 Write-Host ''
 Write-Host 'Patched successfully:' -ForegroundColor Green
-Write-Host '  DRAKM.CC1     - compass, M-key world map, MP regen, shared XP, item names'
+Write-Host '  DRAKM.CC1     - compass, map (M), hints (H), shared XP, item names, bow, stat growth, ring effects'
 Write-Host '  RESI_VGA.6C0  - readable spell font'
 Write-Host '  MAP.DRK       - world map image (new file)'
 Write-Host '  QUEST.DRK     - quest hints page for the H key (new file)'

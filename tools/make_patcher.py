@@ -67,6 +67,9 @@ def main():
 
     subst = {
         'STOCK_DRAKM_SHA': sha(os.path.join(GAME, '_backup', 'original', 'DRAKM.CC1')),
+        # Steam ships DRAKM.CC1 = GOG stock with ONE byte changed (their copy-protection skip:
+        # jne->jmp at decoded-chunk offset 0x11D87). The installers normalize it back to stock.
+        'STEAM_DRAKM_SHA': '8e25bed91fa4b19e4f553a74c43ebf766b676204613b4d921b16c43eae490b16',
         'STOCK_RESI_SHA':  sha(os.path.join(GAME, '_backup', 'original', 'RESI_VGA.6C0')),
         'MOD_DRAKM_SHA':   sha(os.path.join(GAME, 'DRAKM.CC1')),
         'MOD_RESI_SHA':    sha(os.path.join(GAME, 'RESI_VGA.6C0')),

@@ -112,7 +112,7 @@ If you ever bounced off Drakkhen on PC, it was probably one of these — each is
 - **"Only the killer gets XP?"** — kill experience now splits evenly among living party members.
 - **"The bow is useless"** — it shipped as the weakest weapon in the game; now it's worth carrying.
 
-Only the **US GOG release** is supported — the installer verifies your files by checksum and
+The **US GOG and Steam releases** are both supported — the installer verifies your files by checksum and
 refuses anything else (floppy versions, other regions, and the SNES/Amiga ports are different
 builds entirely).
 

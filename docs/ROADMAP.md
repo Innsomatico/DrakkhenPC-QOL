@@ -155,7 +155,13 @@ User's fresh party edited: SCOUT +bow, MAGICIAN +RESTORE ring. NOTE: this is a S
 players' created characters get stock gear. A universal version means patching the creation
 program (DRAKTJ.CC1) - parked; see also 17.
 
-### 17. Steam version support — TODO (needs the user's Steam install files to hash/compare)
+### 17. Steam version support — **DONE** (2026-08-25)
+The Steam release = GOG stock with exactly ONE byte changed per engine (.CC1): Steam's own
+copy-protection skip (jne->jmp at decoded offset 0x11D87 in DRAKM), with .BAK files = untouched GOG
+stock. Both installers now: auto-detect the Steam `game/` subfolder layout, recognize the Steam
+DRAKM hash, normalize that byte back to stock before applying the diff (output byte-identical to
+the GOG reference), and restore returns the STEAM original. Unknown-hash failures now print the
+found vs known hashes and where to report them. Verified on the user's real Steam install.
 
 ---
 
