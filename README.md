@@ -13,7 +13,12 @@ dramatically more playable without changing its character.
 | **Readable spells** | The runic spell/phial font replaced with Latin letters — spell names are plain English (they always were underneath; one rune = one letter). |
 | **Party-shared XP** | Kill XP is split: every living party member gets 1/4 of each award instead of 100% to the killer (Final Fantasy style). |
 | **Item identification** | Rings, staffs and phials show *which* one they are — the contained spell's name is drawn next to the type name. |
-| **Bow buff** | The bow ships as the weakest weapon in the game (power 6, tied with the bludgeon). Now power 12, price 16 — a viable ranged weapon. |
+| **Bow buff** | The bow ships as the weakest weapon in the game (power 6, tied with the bludgeon). Now power 12, price 16 — a viable ranged weapon, and renamed from "arch". |
+| **Working rings & sceptres** | Stock Drakkhen shipped seven passive effects (Invisibility, Protection, Recuperation, Acceleration, Power, Understanding, Impalpability) that no item ever granted — worn rings did nothing. Now a worn ring/sceptre grants its spell's effect; Recuperation doubles regen. |
+| **Quest hints on `H`** | An opt-in hint list for the main quest: SPACE reveals the next step, so spoilers are your choice. |
+| **Class stat growth** | The stock game grants NO stat growth on level-up, ever. Now each class gains stats per level along class-appropriate lines (capped safely at 99). |
+| **No copy-protection prompt** | The "DRAKKHEN CODES" wheel-code interruption never fires. |
+| **Straight to VGA** | The video-card selection menu at launch is skipped. |
 
 ## Install
 
