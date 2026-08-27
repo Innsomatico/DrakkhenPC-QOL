@@ -288,9 +288,21 @@ def main():
     full = sel == set(allkeys)
     print('installing: ' + ', '.join(k for k in allkeys if k in sel))
 
+    def do_cleanup():
+        unused = os.path.join(g, '_backup', 'unused')
+        os.makedirs(unused, exist_ok=True)
+        moved = freed = 0
+        for f in DEAD_FILES:
+            src = os.path.join(g, f)
+            if os.path.exists(src):
+                freed += os.path.getsize(src)
+                os.replace(src, os.path.join(unused, f)); moved += 1
+        print('  cleanup       - %d unused CGA/EGA/Tandy files moved to _backup/unused (%.1f MB)'
+              % (moved, freed / 1048576.0))
+
     db, rb = open(drakm, 'rb').read(), open(resi, 'rb').read()
     if sha(db) == MOD_DRAKM_SHA and sha(rb) == MOD_RESI_SHA:
-        print('Already patched with this version - nothing to do.'); return
+        print('Already patched - rebuilding your current selection from the backed-up originals.')
     if sha(db) != STOCK_DRAKM_SHA and os.path.exists(os.path.join(bak, 'DRAKM.CC1')):
         db = open(os.path.join(bak, 'DRAKM.CC1'), 'rb').read()
         print('DRAKM.CC1 is modified; using the backup copy as the stock source.')
@@ -388,16 +400,7 @@ def main():
             open(cfg, 'wb').write(bytes(cb))
             print('  CONFIG.TAT    - video-card menu skipped (always VGA)')
     if 'cleanup' in sel:
-        unused = os.path.join(g, '_backup', 'unused')
-        os.makedirs(unused, exist_ok=True)
-        moved = freed = 0
-        for f in DEAD_FILES:
-            src = os.path.join(g, f)
-            if os.path.exists(src):
-                freed += os.path.getsize(src)
-                os.replace(src, os.path.join(unused, f)); moved += 1
-        print('  cleanup       - %d unused CGA/EGA/Tandy files moved to _backup/unused (%.1f MB)'
-              % (moved, freed / 1048576.0))
+        do_cleanup()
     print('')
     print('Patched successfully:')
     print('  DRAKM.CC1     - compass, M-key world map, shared XP, item names, bow buff')

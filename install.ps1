@@ -327,8 +327,21 @@ Write-Host ('installing: ' + (($allkeys | Where-Object { $sel.Contains($_) }) -j
 $drakmBytes = [IO.File]::ReadAllBytes($drakm)
 $resiBytes  = [IO.File]::ReadAllBytes($resi)
 $dSha = Get-Sha $drakmBytes; $rSha = Get-Sha $resiBytes
+function Invoke-Cleanup {
+    $unused = Join-Path $GamePath (Join-Path '_backup' 'unused')
+    New-Item -ItemType Directory -Force $unused | Out-Null
+    $moved = 0; $freed = 0
+    foreach ($f in $DeadFiles) {
+        $src = Join-Path $GamePath $f
+        if (Test-Path $src) {
+            $freed += (Get-Item $src).Length
+            Move-Item $src (Join-Path $unused $f) -Force; $moved++
+        }
+    }
+    Write-Host ('  cleanup       - {0} unused CGA/EGA/Tandy files moved to _backup\unused ({1:N1} MB)' -f $moved, ($freed / 1MB))
+}
 if ($dSha -eq $modDrakmSha -and $rSha -eq $modResiSha) {
-    Write-Host 'Already patched with this version - nothing to do.' -ForegroundColor Green; exit 0
+    Write-Host 'Already patched - rebuilding your current selection from the backed-up originals.'
 }
 # allow re-patching a modified install from its own backup
 if ($dSha -ne $stockDrakmSha -and (Test-Path (Join-Path $bak 'DRAKM.CC1'))) {
@@ -449,19 +462,7 @@ if ($sel.Contains('vga') -and (Test-Path $cfg)) {
         Write-Host '  CONFIG.TAT    - video-card menu skipped (always VGA)'
     }
 }
-if ($sel.Contains('cleanup')) {
-    $unused = Join-Path $GamePath (Join-Path '_backup' 'unused')
-    New-Item -ItemType Directory -Force $unused | Out-Null
-    $moved = 0; $freed = 0
-    foreach ($f in $DeadFiles) {
-        $src = Join-Path $GamePath $f
-        if (Test-Path $src) {
-            $freed += (Get-Item $src).Length
-            Move-Item $src (Join-Path $unused $f) -Force; $moved++
-        }
-    }
-    Write-Host ('  cleanup       - {0} unused CGA/EGA/Tandy files moved to _backup\unused ({1:N1} MB)' -f $moved, ($freed / 1MB))
-}
+if ($sel.Contains('cleanup')) { Invoke-Cleanup }
 Write-Host ''
 Write-Host 'Patched successfully:' -ForegroundColor Green
 Write-Host '  DRAKM.CC1     - compass, map (M), hints (H), shared XP, item names, bow, stat growth, ring effects'
