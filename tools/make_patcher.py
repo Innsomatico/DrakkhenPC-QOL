@@ -40,15 +40,24 @@ def main():
     stock_resi  = open(os.path.join(GAME, '_backup', 'original', 'RESI_VGA.6C0'), 'rb').read()
     mod_resi    = open(os.path.join(GAME, 'RESI_VGA.6C0'), 'rb').read()
     mapdrk      = open(os.path.join(GAME, 'MAP.DRK'), 'rb').read()
-    import mod_menu4, hashlib as _h
+    import mod_menu4, mod_menucolor, hashlib as _h, itertools as _it
     com_stock   = open(os.path.join(GAME, '_backup', 'original', 'DRAKKHEN.COM'), 'rb').read()
     com_stock_sha = _h.sha256(com_stock).hexdigest()
     assert com_stock_sha == mod_menu4.STOCK_SHA
-    _cd = bytearray(com_stock)
-    menu4_runs = [[a, b.hex()] for a, b in mod_menu4.runs()]
-    for _a, _b in mod_menu4.runs():
-        _cd[_a - 0x100:_a - 0x100 + len(_b)] = _b
-    com_done_sha = _h.sha256(bytes(_cd)).hexdigest()
+    com_order = ['menu4', 'menucolor']
+    com_mods = {'menu4':     [[a, b.hex()] for a, b in mod_menu4.runs()],
+                'menucolor': [[a, b.hex()] for a, b in mod_menucolor.runs()]}
+    com_desc = {'menu4':     'video-card menu entry removed (4-item main menu)',
+                'menucolor': 'colored menu (blue field, gold text)'}
+    com_shas = {}
+    for _n in (1, 2):
+        for _combo in _it.combinations(com_order, _n):
+            _cd = bytearray(com_stock)
+            for _k in _combo:
+                for _a, _hx in com_mods[_k]:
+                    _b = bytes.fromhex(_hx)
+                    _cd[_a - 0x100:_a - 0x100 + len(_b)] = _b
+            com_shas['+'.join(_combo)] = _h.sha256(bytes(_cd)).hexdigest()
     questdrk    = open(os.path.join(GAME, 'QUEST.DRK'), 'rb').read()
 
     so = [raw for *_, raw in drakpack.unpack_container(stock_drakm)]
@@ -100,6 +109,7 @@ def main():
         ['noprotect', 'Remove the copy-protection prompt', []],
         ['vga',       'Skip the video-card menu (always VGA)', []],
         ['menu4',     'Remove Select-video-card from the main menu (4 items)', ['vga']],
+        ['menucolor', 'Launcher menu in color (blue field, gold text)', []],
     ]
     subst = {
         'FRAGS_JSON':      json.dumps(frag, separators=(',', ':')),
@@ -107,8 +117,10 @@ def main():
         # ''' literal, which would eat json.dumps's escapes before json.loads sees them.
         'MODDEFS_JSON':    json.dumps(moddefs, separators=(',', ':')),
         'STOCK_COM_SHA':   com_stock_sha,
-        'MENU4_DONE_SHA':  com_done_sha,
-        'MENU4_RUNS':      json.dumps(menu4_runs, separators=(',', ':')),
+        'COM_ORDER':       json.dumps(com_order, separators=(',', ':')),
+        'COM_MODS':        json.dumps(com_mods, separators=(',', ':')),
+        'COM_SHAS':        json.dumps(com_shas, separators=(',', ':')),
+        'COM_DESC':        json.dumps(com_desc, separators=(',', ':')),
         'STOCK_DRAKM_SHA': sha(os.path.join(GAME, '_backup', 'original', 'DRAKM.CC1')),
         # Steam ships DRAKM.CC1 = GOG stock with ONE byte changed (their copy-protection skip:
         # jne->jmp at decoded-chunk offset 0x11D87). The installers normalize it back to stock.

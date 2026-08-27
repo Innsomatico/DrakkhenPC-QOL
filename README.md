@@ -22,6 +22,7 @@ dramatically more playable without changing its character.
 | **Class stat growth** | The stock game grants NO stat growth on level-up, ever. Now each class gains stats per level along class-appropriate lines (capped safely at 99). |
 | **No copy-protection prompt** | The "DRAKKHEN CODES" wheel-code interruption never fires. |
 | **Straight to VGA** | The video-card selection menu at launch is skipped. |
+| **Launcher menu in color** | The grey launcher screen becomes a deep blue field with gold text and borders — the palette the stock hardware could always do but the menu never used. |
 | **Clean 4-item main menu** | "Select video card" is removed from the launcher menu entirely (renumbered: Creation / Game / Joystick / Return to DOS). With the card pinned to VGA it was a trap: choosing another card silently loads an unpatched binary and every mod vanishes. |
 
 ## Install

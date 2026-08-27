@@ -219,6 +219,11 @@ Closes the one in-game path that silently unloads every mod by switching to a bi
 patch. Text block + jump table both edited; F5 keypress routed to the menu redraw loop. Verified
 by live memory probe. GOG and Steam DRAKKHEN.COM are byte-identical.
 
+ALSO DONE - launcher menu in color (`mod_menucolor`, key `menucolor`, no deps): blue stipple
+field, gold text/borders - three attr-immediate bytes, palette picked by the user from mockups
+rendered out of the live launcher's video memory. Installers now apply DRAKKHEN.COM mods as a
+verified pipeline (per-combination hashes) since menu4 and menucolor share the file.
+
 PARKED - menu background art (Blazej Kozlowski's wolf, credited): encoder/decoder proven under
 emulation, but every code-hosting spot in the launcher turned out live (see NOTES "The launcher");
 needs a debugger-traced session rather than more bisection. Research and assets preserved.

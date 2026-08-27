@@ -687,3 +687,17 @@ at startup rather than bisecting blind.  A memory-probe harness exists
 (scratch vgaprobe.py/markprobe.py): PrintWindow screenshots of Staging are UNRELIABLE
 (black frames) - probe the text page in process RAM instead, or CopyFromScreen the
 foregrounded window.
+
+### Launcher menu color  (mod_menucolor, 2026-08-27)
+
+User-picked palette from live-probed mockups: **deep blue stipple field, gold text and borders.**
+Three immediate bytes: com:146C (fill attr 07->01), com:14BB (drawer default 07->0E), com:14DD
+(the code-5 attr-reset, kept in lockstep).  The drawer's block language supports per-element
+color (<ATTR:XX> = 04 XX), so finer schemes are possible later by recomposing blocks in place -
+same total length, padding with the ignored 0x01 code.  The 'Loading ......' blink is <ATTR:87>
+in the strip block and resets through com:14DD.
+
+Installer note: menu4 and menucolor both patch DRAKKHEN.COM, so the installers apply COM mods as
+a PIPELINE - stock source (the backup on re-runs), selected mods applied in canonical order, and
+the result verified against a per-combination hash table.  Verified live for all three
+selections: both, color-only (stock 5-item menu, colored), and menu4-on-top-of-color via backup.

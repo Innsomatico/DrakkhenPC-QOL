@@ -28,8 +28,10 @@ QUEST_B64  = '@@QUEST_B64@@'
 FRAGS   = __import__('json').loads('''@@FRAGS_JSON@@''')
 MODDEFS = __import__('json').loads('''@@MODDEFS_JSON@@''')
 STOCK_COM_SHA = '@@STOCK_COM_SHA@@'
-MENU4_DONE_SHA = '@@MENU4_DONE_SHA@@'
-MENU4_RUNS = __import__('json').loads('''@@MENU4_RUNS@@''')
+COM_ORDER = __import__('json').loads('''@@COM_ORDER@@''')
+COM_MODS = __import__('json').loads('''@@COM_MODS@@''')
+COM_SHAS = __import__('json').loads('''@@COM_SHAS@@''')
+COM_DESC = __import__('json').loads('''@@COM_DESC@@''')
 
 
 # ---- BPE codec (mirrors the reference drakpack.py) --------------------------
@@ -330,25 +332,26 @@ def main():
         if sha(quest_bytes) != QUEST_SHA:
             fail('embedded QUEST.DRK failed verification.')
         open(os.path.join(g, 'QUEST.DRK'), 'wb').write(quest_bytes)
-    # DRAKKHEN.COM: remove the main menu's video-card entry (text lines + jump table).
-    if 'menu4' in sel:
+    # DRAKKHEN.COM mods: applied as a pipeline from the stock file (backup = the stock source
+    # on re-runs), then verified against the expected hash for exactly this combination.
+    com_sel = [k for k in COM_ORDER if k in sel]
+    if com_sel:
         comp = os.path.join(g, 'DRAKKHEN.COM')
-        cd = bytearray(open(comp, 'rb').read())
-        if sha(bytes(cd)) == MENU4_DONE_SHA:
-            print('  DRAKKHEN.COM  - already patched')
-        elif sha(bytes(cd)) != STOCK_COM_SHA:
-            fail('DRAKKHEN.COM is not the stock US build - not touching it.')
-        else:
-            cb = os.path.join(bak, 'DRAKKHEN.COM')
-            if not os.path.exists(cb):
-                open(cb, 'wb').write(bytes(cd)); print('backed up DRAKKHEN.COM')
-            for off, hx in MENU4_RUNS:
-                b = bytes.fromhex(hx)
-                cd[off - 0x100:off - 0x100 + len(b)] = b
-            if sha(bytes(cd)) != MENU4_DONE_SHA:
-                fail('patched DRAKKHEN.COM failed verification - nothing was changed.')
-            open(comp, 'wb').write(bytes(cd))
-            print('  DRAKKHEN.COM  - video-card menu entry removed (4-item main menu)')
+        cbk = os.path.join(bak, 'DRAKKHEN.COM')
+        src = open(cbk, 'rb').read() if os.path.exists(cbk) else open(comp, 'rb').read()
+        if sha(src) != STOCK_COM_SHA:
+            fail('DRAKKHEN.COM (or its backup) is not the stock US build - not touching it.')
+        if not os.path.exists(cbk):
+            open(cbk, 'wb').write(src); print('backed up DRAKKHEN.COM')
+        cd = bytearray(src)
+        for k in com_sel:
+            for off, hx in COM_MODS[k]:
+                bb = bytes.fromhex(hx)
+                cd[off - 0x100:off - 0x100 + len(bb)] = bb
+        if sha(bytes(cd)) != COM_SHAS['+'.join(com_sel)]:
+            fail('patched DRAKKHEN.COM failed verification - nothing was changed.')
+        open(comp, 'wb').write(bytes(cd))
+        print('  DRAKKHEN.COM  - ' + ', '.join(COM_DESC[k] for k in com_sel))
 
     # CONFIG.TAT: 0xFFFF at +0x0A = "ask for video card"; 4 = always VGA. Only flip the ask-me value.
     cfg = os.path.join(g, 'CONFIG.TAT')
