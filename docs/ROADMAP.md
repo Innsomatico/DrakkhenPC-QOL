@@ -39,7 +39,26 @@ risk: the HUD slot may truncate names at 7 characters — check the draw routine
 files (1.6 MB: *_CGA/*_EGA binaries, .1XT/.3XT texts, DRAKE/DRAKC/DRAKT* executables, unused
 drivers) - user-requested (2026-08-27). Backup for -restore; store verification also restores.
 
-### 4. Music replacement — REOPENED (2026-08-27): the IFGM driver interface (see NOTES) makes a
+### 4. Music replacement — REOPENED and PLANNED as the "definitive soundtrack" project (2026-08-27):
+User vision: an amalgamation drawing the SNES version's expansive dynamic soundtrack (castles,
+walking, day/night, constellation encounters, teleport, character creation) onto the PC game.
+Architecture settled after a live logging session (instrumented driver, ring-buffer command log):
+  * IFGM-MIDI driver v0.1: install/detect + forward SFX/ticks into the EMBEDDED original OPL
+    driver code (bleeps stay authentic) + placeholder MIDI on song handoff = pipeline proof.
+  * v0.2: real MIDI playback (engine tick = clock), MUSIC.8C1 chunk fingerprinting -> playlist.
+  * v0.3: MUSIC DIRECTOR - the INT F0 context carries the engine's DS, so the driver can peek
+    game state (zone DS:679E, monster records DS:60E6, day/night) and trigger tracks where the
+    PC game never had music. Playlist = user-editable context->track data file.
+  * Creator theme needs a small chunk-0 hook (creator may not speak INT F0 at all).
+  * User supplies SNES tracks as MIDI (VGMusic-era transcriptions exist; SPC->MIDI needs manual
+    cleanup). Authenticity endgame: rip SNES instrument samples into a custom SoundFont.
+Observed live command semantics: AH=00 tick flood (usable as MIDI clock), 0A controls
+(0x40 stop, 0x10 fade, 0x1000/2000/8000+CX=7F resets/volume), 06 song-data segment handoff
+(DX=seg), 04 start, 0C track start (CX=seq#, SI=channel mask). Song change = stop->handoff->
+start->resets->track batch. Instrumented DRDRIVER.6C1 (v3, tick-filtered logging) is currently
+in the GOG dir; stock in _backup/original; scratch sndlog.py reads the ring.
+
+(previous note) REOPENED (2026-08-27): the IFGM driver interface (see NOTES) makes a
 MIDI replacement driver feasible: INT 0xF0 TSR speaking the same AH-function contract, output via
 emulated MPU-401 -> modern synth/SoundFont outside the 640K box. Old assessment below kept for
 history; new effort estimate: L (driver M + command semantics S + music transcription M-L).
