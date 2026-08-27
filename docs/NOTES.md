@@ -764,3 +764,26 @@ Accept and ignore the engine's music-data handoff; our tunes live in our own fil
 unknowns before implementation: exact AH=0A/0C argument semantics (song numbering), and whether
 SFX should stay on OPL (probably yes - keep AH=0C forwarding to a minimal OPL voice, or chain to
 the original driver for SFX only).
+
+### Merchants & the tavern economy (spike, 2026-08-27, live-verified with the user)
+- **Taverns are RUMOR VENDORS**: the "?" click buys information for 100-200 jade. When the party
+  cannot afford it, the keeper says XT text 0x5E "Come back later. A little richer, if possible!"
+  (0.7XT index 0x5E, adjacent to the temple taunt 0x5F). User-verified live: with injected jade the
+  "?" purchases deducted 100-200 each; with the stock 8-32 jade purses the refusal is permanent -
+  which is why merchants seemed absent for ~100 hours.
+- **A full item BUY/SELL shop exists in code** (seg 1743, ~0x0700-0x0960): haggle formula with a
+  -10%/point modifier from [0x7008], prints shop strings ("I will buy it for N Jades", YES/NO via
+  the picker at 1743:03B1), pays into char +0x10 money, increments a per-item counter at
+  [0x700C+...] feeding the "important customer" line. WHICH building type reaches it: unknown.
+- Building doors carry kind 1-4 -> interior scene 0xD/0xC/0xB/0xA (dispatch img 0x101F0-0x10225,
+  table cs:[0x85A]); kind 3 plays song 0x17 (houses), kind 4 song 0x12 (temple). Scene id is
+  stored at door-entity +0x22.
+- Shop message table: [0x6D90] = DS:2ACE = entry 51 of the 88-entry far-ptr table at DS:2A02
+  (verified live: 2477:2ACE -> "Do you want to buy this object ?" at DS:30DC).
+- CAUTION for future readers: args to string-draw 0A4A:0241 are (farptr,x,y) - small constants
+  near it are COORDINATES, not text indexes (a 0x5E coordinate cost an hour of wrong turns).
+- [0x675C] is set to 1 at boot (img 0x05404) and was 1 during the refusal - the ==3 checks in
+  seg 1743 are NOT the tavern gate. Meaning of 3: unknown.
+- Char money display may cap at 100 visually; the memory dword holds larger values fine.
+- NEXT: find the building-kind source in map data -> identify item-shop buildings (if any exist
+  on the map) -> highlight taverns/temples/shops on the M-key map.
