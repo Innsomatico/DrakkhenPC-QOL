@@ -1,4 +1,6 @@
-# Drakkhen mod roadmap
+# Drakkhen QOL - ROADMAP (project stable at v2.0, 2026-08-27; no further updates planned)
+
+Drakkhen mod roadmap
 
 Feature backlog with feasibility. **Keep this file current — edit sections in place, don't append
 duplicates.** Engine facts belong in `NOTES.md`; how-to-write-a-mod belongs in `MODDING.md`.

@@ -21,6 +21,9 @@ dramatically more playable without changing its character.
 | **Magician starts with a RESTORE ring** | The magician begins wearing a RESTORE ring: doubled regeneration from the very first step. (Uses the ring/sceptre mod above.) |
 | **Free temple healing** | Anak temples charged level³×5 jade to heal (a miserly +5 HP per visit) and level³×20 to revive — refusing outright if nobody could pay, so a party wiped early could *never* revive anyone. Now free, no gate, and one visit heals to full; the dead come back at full HP. |
 | **Class stat growth** | The stock game grants NO stat growth on level-up, ever. Now each class gains stats per level along class-appropriate lines (capped safely at 99). |
+| **Free tavern rumors** | Taverns sell information on an *escalating* price ladder — 50, 100, 200, up to 4000 jade per hint, with the tier saved per party. A few early purchases and the keeper's "Come back later. A little richer, if possible!" becomes permanent. Now every rumor is free. |
+| **A merchant in every zone** | The stock game ships a complete, working item shop — selling, buy-back, even loyalty discounts — placed in exactly **one** building on the whole island, and not in the starting zone. Now each zone's spare hut is a merchant; Earth's is the lone inn near the start area (the silent shopkeeper is authentic — Infogrames gave him no lines). |
+| **Unused-file cleanup** | Optionally moves the 47 CGA/EGA/Tandy files (1.6 MB) that become unreachable once the card is pinned to VGA into the backup folder. Restore brings every one back. |
 | **No copy-protection prompt** | The "DRAKKHEN CODES" wheel-code interruption never fires. |
 | **Straight to VGA** | The video-card selection menu at launch is skipped. |
 | **Launcher menu in color** | The grey launcher screen becomes a deep blue field with gold text and borders — the palette the stock hardware could always do but the menu never used. |
@@ -142,6 +145,11 @@ If you ever bounced off Drakkhen on PC, it was probably one of these — each is
 - **"Why is my new party unarmed?"** — the creator hands out starting gear but never equips any of
   it, so a fresh party walks into a hostile world naked with a sword in its pocket. Now it is worn
   from the first step.
+- **"Are there even merchants in this game?"** — there is exactly one shop on the island, hidden in
+  an unmarked building outside the starting zone, and the taverns demand escalating jade for hints
+  until they price you out forever. Now every zone has a merchant and rumors are free.
+- **"I died once and the game is over"** — temple revival costs more than a fresh party owns, so an
+  early death was permanent. Temples are free now.
 
 The **US GOG and Steam releases** are both supported — the installer verifies your files by checksum and
 refuses anything else (floppy versions, other regions, and the SNES/Amiga ports are different

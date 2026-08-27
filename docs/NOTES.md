@@ -816,3 +816,11 @@ the original driver for SFX only).
 - Shipped: band-21 descriptor kind 1->3 plus type-table kind-3 = 0xFE for zones 1/2/3
   (zone 0 stock). Every zone's kind-3 hut is now a shop; Earth has two (band 20 + band 21).
   User-verified live before shipping: sell, click-region buy-back, jade flow all work.
+
+### v2.0 FINAL (2026-08-27): merchants thinned (v1.8.1) and project declared stable
+- Correction to the v1.8 note above: the band-21 descriptor edit was REMOVED - stripes are map
+  ROWS shared by every building at that latitude (row 21 = 4 huts). Shipped design: type-table
+  bytes only; each zone's kind-3 stripe is its shop. Earth's stripe (row 20) holds exactly one
+  building, the inn at map cell (8,20).
+- v2.0 = v1.8.1 content, declared the stable final release. 20 selectable mods. The definitive-
+  soundtrack project remains parked (see the feedback memory and ROADMAP section 4).
