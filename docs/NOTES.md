@@ -787,3 +787,24 @@ the original driver for SFX only).
 - Char money display may cap at 100 visually; the memory dword holds larger values fine.
 - NEXT: find the building-kind source in map data -> identify item-shop buildings (if any exist
   on the map) -> highlight taverns/temples/shops on the M-key map.
+
+### The item shop - FOUND and user-verified working (2026-08-27 live session)
+- Interior type comes from TWO tables: per-building descriptors DS:0456 (4 zones x 8 buildings,
+  byte = speech<<4 | kind, 0xFF = no building) and the TYPE TABLE DS:0476 (4 zones x 4 kinds,
+  signed byte). Type -2 (0xFE) = ITEM SHOP, routed at 01dc:0f6c -> 1743:1319 ([0x7052]=1).
+  Derivation at 0055:079f: kind=[desc]&0xF -> [0x30C]; speech=[desc]>>4 -> [0x30E];
+  [0x310] = typetable[zone*4+kind]. Zone var = [0x2E0].
+- **Engine zone order is NOT element order: engine zone 2 = EARTH (the starting zone)**, probed
+  live. The single vanilla shop is typetable row 0 kind 3 - i.e. NOT in Earth. Which element
+  engine-zone 0 is: unverified (probe [0x2E0] after a Transference).
+- User-verified live (type-table byte flipped in memory): the shop interior WORKS - selling pays
+  real jade; BUYING works via a click-region on his goods (stock = what he has acquired,
+  a buy-back economy); the merchant has no dialogue BY DESIGN (speech nibble 15 on shop
+  buildings, including the vanilla one).
+- Planned mod (user-approved concept, awaiting go): **zonemerchants** - every zone already has
+  exactly one kind-3 building; setting typetable[z][3]=0xFE for the three shopless zones gives
+  one merchant per zone. 3 data bytes in DGROUP init (img 0x1FD40+0x476+z*4+3).
+- Found jewelry is BLANK: world drops roll variant 0 (no spell) for rings/sceptres - probed a
+  live party: found ring/sceptre variant 0, creation RESTORE ring variant 18. The loot
+  generator never enchants; candidate future mod at the drop-creation site (tier tables
+  DS:1C0F/1C3F per mod_startgear notes).

@@ -17,6 +17,8 @@ Mods included:
   * New characters start with their gear already EQUIPPED (the stock game hands it
     over unworn, so a fresh party walks out unarmed until you equip 14 items by hand)
   * The scout starts with a bow instead of a dagger
+  * Tavern rumors are free (stock escalates 50 -> 4000 jade per hint, saved
+    per-party, silently pricing you out of information forever)
   * The magician starts wearing a RESTORE ring (double regen, via the ring mod)
   * Copy-protection code prompt removed; video-card menu skipped (always VGA)
   * Optional cleanup: unused CGA/EGA/Tandy files (~1.5 MB) moved into the backup
