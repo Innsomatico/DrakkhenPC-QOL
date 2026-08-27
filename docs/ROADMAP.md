@@ -213,6 +213,16 @@ fighter's buckler/sword destinations are swapped to put every class's weapon in 
 four writes become 4. Runs last in the build so it also catches the bow and the
 startring pool. `verify_startgear.py --matrix` proves all 7 combinations of the start* mods.
 
+ALSO DONE - the launcher main menu (`mod_menu4`, key `menu4`, requires `vga`): "F3 Select video
+card" removed, menu renumbered to a clean 4 items (Creation / Game / Joystick / Return to DOS).
+Closes the one in-game path that silently unloads every mod by switching to a binary we do not
+patch. Text block + jump table both edited; F5 keypress routed to the menu redraw loop. Verified
+by live memory probe. GOG and Steam DRAKKHEN.COM are byte-identical.
+
+PARKED - menu background art (Blazej Kozlowski's wolf, credited): encoder/decoder proven under
+emulation, but every code-hosting spot in the launcher turned out live (see NOTES "The launcher");
+needs a debugger-traced session rather than more bisection. Research and assets preserved.
+
 ### 17. Steam version support — **DONE** (2026-08-25)
 The Steam release = GOG stock with exactly ONE byte changed per engine (.CC1): Steam's own
 copy-protection skip (jne->jmp at decoded offset 0x11D87 in DRAKM), with .BAK files = untouched GOG

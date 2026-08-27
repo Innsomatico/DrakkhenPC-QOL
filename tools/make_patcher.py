@@ -40,6 +40,15 @@ def main():
     stock_resi  = open(os.path.join(GAME, '_backup', 'original', 'RESI_VGA.6C0'), 'rb').read()
     mod_resi    = open(os.path.join(GAME, 'RESI_VGA.6C0'), 'rb').read()
     mapdrk      = open(os.path.join(GAME, 'MAP.DRK'), 'rb').read()
+    import mod_menu4, hashlib as _h
+    com_stock   = open(os.path.join(GAME, '_backup', 'original', 'DRAKKHEN.COM'), 'rb').read()
+    com_stock_sha = _h.sha256(com_stock).hexdigest()
+    assert com_stock_sha == mod_menu4.STOCK_SHA
+    _cd = bytearray(com_stock)
+    menu4_runs = [[a, b.hex()] for a, b in mod_menu4.runs()]
+    for _a, _b in mod_menu4.runs():
+        _cd[_a - 0x100:_a - 0x100 + len(_b)] = _b
+    com_done_sha = _h.sha256(bytes(_cd)).hexdigest()
     questdrk    = open(os.path.join(GAME, 'QUEST.DRK'), 'rb').read()
 
     so = [raw for *_, raw in drakpack.unpack_container(stock_drakm)]
@@ -90,12 +99,16 @@ def main():
         ['bow',       'Bow buff (power 8, arch renamed to bow)', []],
         ['noprotect', 'Remove the copy-protection prompt', []],
         ['vga',       'Skip the video-card menu (always VGA)', []],
+        ['menu4',     'Remove Select-video-card from the main menu (4 items)', ['vga']],
     ]
     subst = {
         'FRAGS_JSON':      json.dumps(frag, separators=(',', ':')),
         # NB: labels must contain no " or \ - MODDEFS_JSON is embedded inside a Python
         # ''' literal, which would eat json.dumps's escapes before json.loads sees them.
         'MODDEFS_JSON':    json.dumps(moddefs, separators=(',', ':')),
+        'STOCK_COM_SHA':   com_stock_sha,
+        'MENU4_DONE_SHA':  com_done_sha,
+        'MENU4_RUNS':      json.dumps(menu4_runs, separators=(',', ':')),
         'STOCK_DRAKM_SHA': sha(os.path.join(GAME, '_backup', 'original', 'DRAKM.CC1')),
         # Steam ships DRAKM.CC1 = GOG stock with ONE byte changed (their copy-protection skip:
         # jne->jmp at decoded-chunk offset 0x11D87). The installers normalize it back to stock.

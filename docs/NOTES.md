@@ -541,3 +541,149 @@ rebuilt; no engine risk at all.  Item names are harder: they live in a packed NU
 at **DS:2A46** (pointer installed at img 0x03BCC: `mov word [6CE8], 0x2A46`), located by ORDINAL
 via the index table at DS:1CBB, so lengthening one name has to be paid for by shortening another,
 and the inventory column is only ~7-8 characters wide before the suffix mod_itemname draws.
+
+### Reclaiming the alternate asset set: 382 more bytes  (analysed 2026-08-26, NOT yet used)
+
+The four filename tables are two PAIRS, not four variants.  Tables 1/3 name the `.6c1/.7c1/.8c1/
+.7xt` set (the files this release actually ships); tables 2/4 name an alternate `.2c1/.4c1/.4xt`
+set.  Within a pair the filenames are identical but the tables are NOT byte-identical - each
+points at its own copy of the strings, exactly 0x220 apart:
+
+    t1 tbl DS:1958  strings DS:204E      t3 tbl DS:1A30  strings DS:226E
+    t2 tbl DS:19C4  strings DS:215E      t4 tbl DS:1A9C  strings DS:237E
+
+Each table is 108 B = **27 far pointers** (offset + DGROUP segment), which is why every odd word
+reads 0x1FD4.
+
+**Which are live.**  The selector at img 0x053DF reads byte 0 of the file **DRK1** (fallback
+DRK2, opened at img 0x03E31) and does:
+
+```
+cmp ax, 5
+je  -> [60D8] = 0x1A30    ; table 3
+jne -> [60D8] = 0x1A9C    ; table 4
+```
+
+`DRK1` = `05 01 01 01`, so byte 0 is 5 and **table 3 is always chosen**.  A raw little-endian
+word scan of the whole image finds tables 1 and 2 referenced **zero** times in code or data, and
+tables 3/4 exactly once each - here.  (The only operands that fall inside the orphan string range
+are `cmp [0x2F0], 8392` / `cmp [0x2F0], 8492` at img 0x02086 - a 100-wide numeric window, not
+pointers; they land mid-string.)
+
+**Table 4 is already non-functional**: 15 of its 27 files do not exist in this release
+(`pers_vga.4c1`, `exte_vga.4c0`, `inte_vga.4c0`, `game_vga.4c1`, `mons_vga.4c1`, `reg.4c1`,
+`drk4`, `0/1/2.4xt`, `music.4c1`, `gamebvga.4c1`, `game.4AL`, `end.4AL`, `drksv`).  If that
+branch were ever taken the game would fail to load regardless.
+
+**So it can be reclaimed.**  Patch the `jne` at img 0x053E2 (`75 0C`) to two NOPs so the selector
+always installs table 3.  Table 4 and its string set then become provably unreachable:
+
+    table 4 pointers  DS:1A9C..1B08   108 B
+    table 4 strings   DS:237E..2490   274 B
+    TOTAL                             382 B      (vs 758 B in the existing data pool)
+
+This is strictly MORE robust than stock - the branch it removes leads to a guaranteed load
+failure.  Not implemented yet: there is no queued mod that needs the room, and capacity with no
+consumer is speculative.  When something needs it, add the two ranges to `drakmod.SPACE` behind
+the selector patch, exactly as `alloc_code` is gated on `mod_noprotect`.
+
+**The video mode IS user-switchable at any time - via DRAKKHEN.COM, not DRAKM.**  (An earlier
+revision of this file claimed otherwise; that was wrong, and was written without opening
+DRAKKHEN.COM.)  The launcher draws:
+
+```
+Main Menu                      Select Video Card
+  F1  Creation                   F1  CGA      4   colors
+  F2  Game                       F2  EGA      16  colors
+  F3  Select video card          F3  Tandy    16  colors
+  F4  Joystick calibration       F4  VGA      256 colors
+  F5  Return to DOS              F5  HERCULES Monochrome
+```
+
+F1/F2 being separate entries is independent confirmation of the two-executable finding: F1 runs
+the creator (chunk 0), F2 the game (chunk 1).
+
+Choosing a non-VGA card rewrites `Config.tat` (string at com:0x01D5) and the next launch loads a
+DIFFERENT executable - DRAKE (EGA), DRAKC (CGA), DRAKTC/DRAKTJ (Tandy/Hercules) - none of which
+this project patches.  **Consequence: every QOL mod silently disappears and the CONFIG.TAT video
+byte mod_novideomenu set is overwritten.**  It is not a crash, it is a "where did my mods go"
+bug, and it is reachable from the main menu at any time.
+
+This does NOT endanger reclaiming table 4: that table lives inside DRAKM, and if the player
+selects EGA then DRAKM is not loaded at all.
+
+**The launcher already has a hide mechanism**, so suppressing F3 is tractable.  Main-menu key
+loop at com:0x116A:
+
+```
+mov ah,0 / int 16h
+cmp ah,0x3B / jl loop          ; below F1
+cmp ah,0x45 / jg loop          ; above F10
+sub ah,0x3B                    ; F1..F5 -> 0..4
+cmp ah,5   / jae redraw
+mov al,ah
+lea bx,[0x1ED] / xlatb         ; 5-byte dispatch table
+cmp al,0xFF / je loop          ; 0xFF = no such visible entry
+mov cs:[0x1A5A],ax             ; accept
+```
+
+The table at com:0x01ED is built at runtime (com:0x1109): filled with 0xFF, then walked against a
+5-word descriptor array at `cs:[0x01CD]` - a zero word hides that entry, and only VISIBLE entries
+consume a slot (`mov cs:[di],cl / inc di`), so hiding one renumbers the rest exactly as the game
+would.  Zeroing the F3 descriptor word would therefore give a clean four-item menu.  NOT yet
+implemented: `cs:[0x01CD]` is itself assigned at runtime and that assignment has not been traced.
+
+The engine's own F-key handler (img 0x19FFC in DRAKM) is unrelated: F7 makes a call and F1..F6
+store byte pairs - (1,0x0C) (2,0x0B) (3,0x0A) (4,9) (3,8) (3,7) - to `cs:[0x60AE]`/`cs:[0x60AF]`,
+which are written in six places and read nowhere in the engine, so they are consumed by the
+separately loaded driver.  Those are not a video selector.
+
+### The launcher, DRAKKHEN.COM: menu surgery and the art post-mortem  (2026-08-27)
+
+**mod_menu4 (SHIPPED)** removes "F3 Select video card" from the main menu - with the card pinned
+to VGA it was the one in-game path that silently unloads every mod (picking another card rewrites
+Config.tat and the next Play loads DRAKE/DRAKC/DRAKT*, which we do not patch).  The menu is a
+static text block plus a parallel jump table, so both halves are edited:
+
+  * lines com:04D1/04FA/0523 (36 chars, inside the block drawn from com:040A): F3 becomes
+    Joystick calibration, F4 becomes Return to DOS, F5 blank.
+  * jump table com:01C3 (5 words, dispatched by `jmp word cs:[bx+0x1C3]` at com:104E):
+    {Creation, Game, video, joystick, exit} -> {Creation, Game, joystick, exit, redraw}.
+    The key filter (com:1041) accepts F1..F5 before dispatch, so slot 4 must stay valid -
+    it now points at the redraw loop (com:103B) and a stray F5 does nothing.
+
+Verified by memory probe of the live launcher: Main Menu / Creation / Game / Joystick /
+Return to DOS, no fifth entry.  GOG and Steam ship byte-identical DRAKKHEN.COM
+(sha256 32060c0f...), so one hash covers both.  Requires mod_novideomenu: it preempts the
+first-boot card prompt, so together no card selection is reachable at all.
+
+**Launcher facts** (hard-won, reusable):
+  * Entry jmp -> com:0FB6.  `mov sp,0x1A4E`; Config.tat is read WHOLE to com:0x1A50
+    (`cx=0xFFFF`), then `[0x151] = 0x1A50 + bytes_read` and the program SHRINKS its own
+    memory block to that boundary (int 21/4A at com:1215) - anything appended to the COM
+    file is deallocated, and Config.tat is size-sensitive (enlarging it kills the launcher:
+    something consumes bytes_read as a length).  The '(c) Infogrames' title block, the
+    5-word video-card availability table (config+0x0E), and the text-block pointers all
+    live inside the loaded config.
+  * The block-drawer (com:148E) is a mini-language: 0x0D newline, 0x24/0x00 end, 0x03 skip-N,
+    0x04 attr-follows, 0x02 RLE-run, row stride 0xA0.
+  * The card-menu lines (com:0646..0712, via pointer table com:063C) are STAMPED at runtime
+    (digit written at line+5) even when the card menu never shows.  The "memory required"
+    text at com:0x225 OVERLAPS live variables (startup stores a far pointer at 0x26C/0x26E;
+    the EXEC parameter block lives around 0x25C).  The SSSSSSSS card-mismatch text at
+    com:038B is a template the mismatch path stamps the card name into (writer at com:1399).
+    **Practically none of the launcher's "dead-looking" text is safe to overwrite.**
+
+**Menu background art - WIP, NOT shipped.**  The plan (replace the 0xB1 stipple fill at
+com:1466 with an RLE-decoded 80x24 char/attr image; Blazej Kozlowski's "-bug" wolf, initials
+kept per the Respect ASCII Artists Campaign, menu box moved to column 1) is built and the
+pieces are proven separately: encoder + decoder verified byte-exact under Unicorn both with
+art present and with the fallback path, `_tools`/scratch has the composed 973-byte RLE.
+Every in-place hosting attempt died on the constraints above (COM append -> deallocated;
+config append -> size-sensitive; card lines -> stamped; 0x225 -> live variables), and the
+final variant still hangs before the first fill call for an untraced reason.  Next session
+should run dosbox_with_debugger.exe (in the Steam folder) and trace com:1466's caller chain
+at startup rather than bisecting blind.  A memory-probe harness exists
+(scratch vgaprobe.py/markprobe.py): PrintWindow screenshots of Staging are UNRELIABLE
+(black frames) - probe the text page in process RAM instead, or CopyFromScreen the
+foregrounded window.

@@ -264,7 +264,7 @@ def build(mods):
 
 if __name__ == '__main__':
     import mod_compass, mod_map, mod_regen, mod_partyxp, mod_itemname, mod_bow, mod_noprotect, mod_journal, mod_levelup, mod_ring, mod_startgear, mod_startring, mod_startworn
-    import mod_spellfont, mod_novideomenu
+    import mod_spellfont, mod_novideomenu, mod_menu4
     # mod_regen is DROPPED (user's call, 2026-08-23): a crash on packing characters ended it.
     # The mod file and the research in NOTES.md/ROADMAP.md remain if it is ever revisited.
     build([('compass', mod_compass.apply), ('map', mod_map.apply),
@@ -278,3 +278,4 @@ if __name__ == '__main__':
     orig = os.path.join(GAME, '_backup', 'original')
     mod_spellfont.apply_data(orig, GAME)
     mod_novideomenu.apply_data(orig, GAME)
+    mod_menu4.apply_data(orig, GAME)

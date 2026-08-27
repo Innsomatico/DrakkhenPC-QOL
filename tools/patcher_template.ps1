@@ -31,6 +31,11 @@ if (-not (Test-Path $resi)) { Fail "RESI_VGA.6C0 not found in '$GamePath'." }
 
 # ---- restore mode ----------------------------------------------------------
 if ($Restore) {
+    $comb = Join-Path $bak 'DRAKKHEN.COM'
+    if (Test-Path $comb) {
+        Copy-Item $comb (Join-Path $GamePath 'DRAKKHEN.COM') -Force
+        Write-Host 'restored DRAKKHEN.COM'
+    }
     foreach ($f in 'DRAKM.CC1', 'RESI_VGA.6C0') {
         $src = Join-Path $bak $f
         if (-not (Test-Path $src)) { Fail "no backup at $src - nothing to restore." }
@@ -373,6 +378,37 @@ if ($sel.Contains('hints')) {
     if ((Get-Sha $questBytes) -ne $questSha) { Fail 'embedded QUEST.DRK failed verification.' }
     [IO.File]::WriteAllBytes((Join-Path $GamePath 'QUEST.DRK'), $questBytes)
 }
+# DRAKKHEN.COM: remove the main menu's video-card entry (text lines + jump table).
+$stockComSha = '@@STOCK_COM_SHA@@'
+$menu4DoneSha = '@@MENU4_DONE_SHA@@'
+if ($sel.Contains('menu4')) {
+    $comp = Join-Path $GamePath 'DRAKKHEN.COM'
+    $cd = [IO.File]::ReadAllBytes($comp)
+    $cs = (Get-FileHash -Algorithm SHA256 $comp).Hash.ToLower()
+    if ($cs -eq $menu4DoneSha) {
+        Write-Host '  DRAKKHEN.COM  - already patched'
+    } elseif ($cs -ne $stockComSha) {
+        Fail 'DRAKKHEN.COM is not the stock US build - not touching it.'
+    } else {
+        $cb2 = Join-Path $bak 'DRAKKHEN.COM'
+        if (-not (Test-Path $cb2)) { Copy-Item $comp $cb2; Write-Host 'backed up DRAKKHEN.COM' }
+        $runs = '@@MENU4_RUNS@@' | ConvertFrom-Json
+        foreach ($r in $runs) {
+            $off = [int]$r[0] - 0x100; $hex = $r[1]
+            for ($i = 0; $i -lt $hex.Length; $i += 2) {
+                $cd[$off + ($i / 2)] = [Convert]::ToByte($hex.Substring($i, 2), 16)
+            }
+        }
+        [IO.File]::WriteAllBytes($comp, $cd)
+        $vs = (Get-FileHash -Algorithm SHA256 $comp).Hash.ToLower()
+        if ($vs -ne $menu4DoneSha) {
+            Copy-Item $cb2 $comp -Force
+            Fail 'patched DRAKKHEN.COM failed verification - original restored.'
+        }
+        Write-Host '  DRAKKHEN.COM  - video-card menu entry removed (4-item main menu)'
+    }
+}
+
 # CONFIG.TAT: 0xFFFF at +0x0A means "ask for video card every launch"; 4 = always VGA.
 # Only flip it if it is still the ask-me value - a player's own choice is left alone.
 $cfg = Join-Path $GamePath 'CONFIG.TAT'

@@ -27,6 +27,9 @@ QUEST_SHA  = '@@QUEST_SHA@@'
 QUEST_B64  = '@@QUEST_B64@@'
 FRAGS   = __import__('json').loads('''@@FRAGS_JSON@@''')
 MODDEFS = __import__('json').loads('''@@MODDEFS_JSON@@''')
+STOCK_COM_SHA = '@@STOCK_COM_SHA@@'
+MENU4_DONE_SHA = '@@MENU4_DONE_SHA@@'
+MENU4_RUNS = __import__('json').loads('''@@MENU4_RUNS@@''')
 
 
 # ---- BPE codec (mirrors the reference drakpack.py) --------------------------
@@ -208,6 +211,10 @@ def main():
         fail("game files not found in '%s' - run from the Drakkhen folder or pass its path." % g)
 
     if a.restore:
+        comb = os.path.join(bak, 'DRAKKHEN.COM')
+        if os.path.exists(comb):
+            open(os.path.join(g, 'DRAKKHEN.COM'), 'wb').write(open(comb, 'rb').read())
+            print('restored DRAKKHEN.COM')
         for f in ('DRAKM.CC1', 'RESI_VGA.6C0'):
             src = os.path.join(bak, f)
             if not os.path.exists(src):
@@ -323,6 +330,26 @@ def main():
         if sha(quest_bytes) != QUEST_SHA:
             fail('embedded QUEST.DRK failed verification.')
         open(os.path.join(g, 'QUEST.DRK'), 'wb').write(quest_bytes)
+    # DRAKKHEN.COM: remove the main menu's video-card entry (text lines + jump table).
+    if 'menu4' in sel:
+        comp = os.path.join(g, 'DRAKKHEN.COM')
+        cd = bytearray(open(comp, 'rb').read())
+        if sha(bytes(cd)) == MENU4_DONE_SHA:
+            print('  DRAKKHEN.COM  - already patched')
+        elif sha(bytes(cd)) != STOCK_COM_SHA:
+            fail('DRAKKHEN.COM is not the stock US build - not touching it.')
+        else:
+            cb = os.path.join(bak, 'DRAKKHEN.COM')
+            if not os.path.exists(cb):
+                open(cb, 'wb').write(bytes(cd)); print('backed up DRAKKHEN.COM')
+            for off, hx in MENU4_RUNS:
+                b = bytes.fromhex(hx)
+                cd[off - 0x100:off - 0x100 + len(b)] = b
+            if sha(bytes(cd)) != MENU4_DONE_SHA:
+                fail('patched DRAKKHEN.COM failed verification - nothing was changed.')
+            open(comp, 'wb').write(bytes(cd))
+            print('  DRAKKHEN.COM  - video-card menu entry removed (4-item main menu)')
+
     # CONFIG.TAT: 0xFFFF at +0x0A = "ask for video card"; 4 = always VGA. Only flip the ask-me value.
     cfg = os.path.join(g, 'CONFIG.TAT')
     if 'vga' in sel and os.path.exists(cfg):
