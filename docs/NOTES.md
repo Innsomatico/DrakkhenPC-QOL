@@ -808,3 +808,11 @@ the original driver for SFX only).
   live party: found ring/sceptre variant 0, creation RESTORE ring variant 18. The loot
   generator never enchants; candidate future mod at the drop-creation site (tier tables
   DS:1C0F/1C3F per mod_startgear notes).
+
+### merchants mod (v1.8) - corrections to the interior tables
+- The descriptor table DS:0456 is indexed GLOBALLY by the door's map Y-band (Y >> 9), not
+  4x8 by zone; zones occupy Y ranges so bands 0-7/8-15/16-23/24-31 group by zone anyway.
+  The user's chosen Earth hut = band 21 (door y=0x2A00), stock byte 0xF1.
+- Shipped: band-21 descriptor kind 1->3 plus type-table kind-3 = 0xFE for zones 1/2/3
+  (zone 0 stock). Every zone's kind-3 hut is now a shop; Earth has two (band 20 + band 21).
+  User-verified live before shipping: sell, click-region buy-back, jade flow all work.
