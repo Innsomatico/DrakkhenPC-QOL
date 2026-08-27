@@ -1,5 +1,5 @@
-Drakkhen QOL patch (US GOG version)
-====================================
+Drakkhen QOL patch (US GOG and Steam releases)
+==============================================
 
 Mods included:
   * Compass in the 3D view (needle tracks your heading)
@@ -14,12 +14,19 @@ Mods included:
   * Kill XP shared: every living party member gets 1/4 of each award
   * Bow buffed from weakest weapon in the game to a real choice (power 8, on par with
     the short sword), renamed from "arch"
+  * New characters start with their gear already EQUIPPED (the stock game hands it
+    over unworn, so a fresh party walks out unarmed until you equip 14 items by hand)
+  * The scout starts with a bow instead of a dagger
+  * The magician starts wearing a RESTORE ring (double regen, via the ring mod)
   * Copy-protection code prompt removed; video-card menu skipped (always VGA)
 
 Install:
-  1. Copy install.ps1 into your Drakkhen game folder
-     (the one containing DRAKKHEN.COM and DRAKM.CC1 - for GOG typically
-      C:\Program Files\GOG Galaxy\Games\Drakkhen)
+  1. Copy install.ps1 into your Drakkhen folder:
+       GOG   - the folder holding DRAKKHEN.COM and DRAKM.CC1, typically
+               C:\Program Files\GOG Galaxy\Games\Drakkhen
+       Steam - the folder ABOVE game\, typically
+               C:\Program Files (x86)\Steam\steamapps\common\Drakkhen
+               (the installer locates game\ by itself and says so)
   2. Right-click install.ps1 -> Run with PowerShell
      (or from a terminal:  powershell -ExecutionPolicy Bypass -File install.ps1)
 

@@ -63,6 +63,11 @@ class Builder:
         chunks = [raw for *_, raw in drakpack.unpack_container(open(ORIG, 'rb').read())]
         self.chunks = chunks
         self.exe = bytearray(chunks[1])
+        # Chunk 0 is a SECOND MZ image: the character creator (DGROUP 0x06B8).  Mods that
+        # change what a new character starts with live there - see NOTES.md.  It needs no
+        # relocation bookkeeping because those edits are immediate operands, so it is kept
+        # as one flat buffer and journalled separately as 'writes0'.
+        self.img0 = bytearray(chunks[0])
         self.h = list(struct.unpack_from('<14H', self.exe))
         self.hdr = self.h[4] * 16
         self.img = bytearray(self.exe[self.hdr:])
@@ -180,6 +185,8 @@ class Builder:
             assert lin not in seen, 'duplicate relocation at %04x:%04x' % (seg, off)
             seen.add(lin)
         struct.pack_into('<14H', self.exe, 0, *self.h)
+        assert len(self.img0) == len(self.chunks[0]), 'creator image size changed'
+        self.chunks[0] = bytes(self.img0)
         self.chunks[1] = bytes(self.exe[:self.hdr]) + bytes(self.img)
         open(path, 'wb').write(drakpack.pack_container(self.chunks))
         return path
@@ -215,6 +222,7 @@ def build(mods):
     order = []
     for name, m in mods:
         img_before = bytes(b.img)
+        img0_before = bytes(b.img0)
         relocs_before = set(b.relocs.keys())
         added_before = len(b.added)
         rep_before = len(b.repointed)
@@ -229,7 +237,17 @@ def build(mods):
                     runs.append((s0, p0 + 1)); s0 = i
                 p0 = i
             runs.append((s0, p0 + 1))
+        d0 = [i for i in range(len(b.img0)) if b.img0[i] != img0_before[i]]
+        runs0 = []
+        if d0:
+            s0 = p0 = d0[0]
+            for i in d0[1:]:
+                if i - p0 > 8:
+                    runs0.append((s0, p0 + 1)); s0 = i
+                p0 = i
+            runs0.append((s0, p0 + 1))
         frags[name] = {
+            'writes0': [[s0, bytes(b.img0[s0:e0]).hex()] for s0, e0 in runs0],
             'writes': [[b.hdr + s0, bytes(b.img[s0:e0]).hex()] for s0, e0 in runs],
             'radd':   [[off, seg] for off, seg in b.added[added_before:]],
             'rrep':   [[o, off, seg] for o, off, seg in b.repointed[rep_before:]],
@@ -245,7 +263,7 @@ def build(mods):
     return p
 
 if __name__ == '__main__':
-    import mod_compass, mod_map, mod_regen, mod_partyxp, mod_itemname, mod_bow, mod_noprotect, mod_journal, mod_levelup, mod_ring
+    import mod_compass, mod_map, mod_regen, mod_partyxp, mod_itemname, mod_bow, mod_noprotect, mod_journal, mod_levelup, mod_ring, mod_startgear, mod_startring, mod_startworn
     import mod_spellfont, mod_novideomenu
     # mod_regen is DROPPED (user's call, 2026-08-23): a crash on packing characters ended it.
     # The mod file and the research in NOTES.md/ROADMAP.md remain if it is ever revisited.
@@ -253,7 +271,9 @@ if __name__ == '__main__':
            ('partyxp', mod_partyxp.apply), ('itemname', mod_itemname.apply),
            ('bow', mod_bow.apply), ('noprotect', mod_noprotect.apply),
            ('hints', mod_journal.apply), ('levelup', mod_levelup.apply),
-           ('ring', mod_ring.apply)])
+           ('ring', mod_ring.apply), ('startgear', mod_startgear.apply), ('startring', mod_startring.apply),
+           # startworn LAST: it flags the gear records other start* mods may have edited
+           ('startworn', mod_startworn.apply)])
     # Data-only mods: these patch loose game files, not the engine, so they cost no dead space.
     orig = os.path.join(GAME, '_backup', 'original')
     mod_spellfont.apply_data(orig, GAME)

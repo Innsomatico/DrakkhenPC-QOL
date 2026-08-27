@@ -44,7 +44,11 @@ def main():
 
     so = [raw for *_, raw in drakpack.unpack_container(stock_drakm)]
     sm = [raw for *_, raw in drakpack.unpack_container(mod_drakm)]
-    assert len(so) == len(sm) == 2 and so[0] == sm[0] and len(so[1]) == len(sm[1])
+    # chunk 0 is the character creator and IS patched now (mod_startgear); both chunks must
+    # keep their exact size, since a larger image starves the loader ("insert Disk 3").
+    assert len(so) == len(sm) == 2
+    assert len(so[0]) == len(sm[0]) and len(so[1]) == len(sm[1])
+    diff0 = runs_of_diff(so[0], sm[0])          # creator chunk (mod_startgear)
     diff = runs_of_diff(so[1], sm[1])
     diff_lines = '\n'.join('%d:%s' % (s, sm[1][s:e].hex()) for s, e in diff)
 
@@ -58,7 +62,10 @@ def main():
     patched = bytearray(so[1])
     for s, e in diff:
         patched[s:e] = sm[1][s:e]
-    assert drakpack.pack_container([so[0], bytes(patched)]) == mod_drakm, 'container roundtrip failed'
+    patched0 = bytearray(so[0])
+    for s, e in diff0:
+        patched0[s:e] = sm[0][s:e]
+    assert drakpack.pack_container([bytes(patched0), bytes(patched)]) == mod_drakm,         'container roundtrip failed'
     rp = bytearray(r_stock)
     for s, e in rdiff:
         rp[s:e] = bytes(r_mod)[s:e]
@@ -76,13 +83,18 @@ def main():
         ['itemname',  'Item identification (ring/sceptre/phial names)', []],
         ['ring',      'Working ring & sceptre effects', ['noprotect']],
         ['levelup',   'Class-based stat growth on level-up', []],
+        ['startgear', 'Scout starts with a bow instead of a dagger', ['bow']],
+        ['startring', 'Magician starts wearing a RESTORE ring', ['ring']],
+        ['startworn', 'New characters start with their gear equipped', []],
         ['partyxp',   'Party-shared kill XP', []],
-        ['bow',       'Bow buff (power 12, renamed)', []],
+        ['bow',       'Bow buff (power 8, arch renamed to bow)', []],
         ['noprotect', 'Remove the copy-protection prompt', []],
         ['vga',       'Skip the video-card menu (always VGA)', []],
     ]
     subst = {
         'FRAGS_JSON':      json.dumps(frag, separators=(',', ':')),
+        # NB: labels must contain no " or \ - MODDEFS_JSON is embedded inside a Python
+        # ''' literal, which would eat json.dumps's escapes before json.loads sees them.
         'MODDEFS_JSON':    json.dumps(moddefs, separators=(',', ':')),
         'STOCK_DRAKM_SHA': sha(os.path.join(GAME, '_backup', 'original', 'DRAKM.CC1')),
         # Steam ships DRAKM.CC1 = GOG stock with ONE byte changed (their copy-protection skip:
@@ -111,8 +123,8 @@ def main():
         sums += '%s  %s\n' % (sha(os.path.join(OUT, f)), f)
     open(os.path.join(OUT, 'SHA256SUMS.txt'), 'w', newline='\n').write(sums)
 
-    open(os.path.join(OUT, 'README.txt'), 'w', newline='\r\n').write('''Drakkhen QOL patch (US GOG version)
-====================================
+    open(os.path.join(OUT, 'README.txt'), 'w', newline='\r\n').write('''Drakkhen QOL patch (US GOG and Steam releases)
+==============================================
 
 Mods included:
   * Compass in the 3D view (needle tracks your heading)
@@ -127,12 +139,19 @@ Mods included:
   * Kill XP shared: every living party member gets 1/4 of each award
   * Bow buffed from weakest weapon in the game to a real choice (power 8, on par with
     the short sword), renamed from "arch"
+  * New characters start with their gear already EQUIPPED (the stock game hands it
+    over unworn, so a fresh party walks out unarmed until you equip 14 items by hand)
+  * The scout starts with a bow instead of a dagger
+  * The magician starts wearing a RESTORE ring (double regen, via the ring mod)
   * Copy-protection code prompt removed; video-card menu skipped (always VGA)
 
 Install:
-  1. Copy install.ps1 into your Drakkhen game folder
-     (the one containing DRAKKHEN.COM and DRAKM.CC1 - for GOG typically
-      C:\\Program Files\\GOG Galaxy\\Games\\Drakkhen)
+  1. Copy install.ps1 into your Drakkhen folder:
+       GOG   - the folder holding DRAKKHEN.COM and DRAKM.CC1, typically
+               C:\\Program Files\\GOG Galaxy\\Games\\Drakkhen
+       Steam - the folder ABOVE game\\, typically
+               C:\\Program Files (x86)\\Steam\\steamapps\\common\\Drakkhen
+               (the installer locates game\\ by itself and says so)
   2. Right-click install.ps1 -> Run with PowerShell
      (or from a terminal:  powershell -ExecutionPolicy Bypass -File install.ps1)
 

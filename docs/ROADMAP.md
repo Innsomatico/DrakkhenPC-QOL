@@ -114,7 +114,8 @@ flags, tier, power, id, price - NOTES.md) and that the bow ships as the weakest 
 possible (spare ids 0x45/0x46, catalog row fits at DS:204E, pair-emission mechanism exists) but the
 id-indexed tables at DS:1B38..1CFD are PACKED edge-to-edge, so a new id means relocating tables and
 patching every reader, plus unresearched drop tables - user chose the fallback: `mod_bow.py` patches
-the bow's own catalog record to power 12, price 16. Every bow bought or dropped from now on uses it;
+the bow's own catalog record to power 8, price 12 (v2 - 12 was too strong in play). Every bow
+bought or dropped from now on uses it;
 bows already sitting in a save keep their old copied stats (drop/rebuy to upgrade).
 
 ### 13. Quest journal — researched, DESIGN READY, effort M (v1) / L (v2)
@@ -150,73 +151,67 @@ User confirmed Recuperation (regen doubles, shows in ability list after sheet re
 Invisibility in play. Sheet refresh on equip is a known cosmetic lag. Stat+2 rings from the SNES
 guide: judged not worth the code (user's call).
 
-### 16. Starting equipment — STILL OPEN, large trace; findings + dead ends below
-GOAL (user, unchanged): new characters born with gear - SCOUT +bow, MAGICIAN +RESTORE ring.
-NOT a save edit. The user's own save already has them; this is for everyone else.
+### 16. Starting equipment — **SOLVED, bow shipped** (2026-08-26)
+GOAL (user): new characters born with gear - SCOUT +bow, MAGICIAN +RESTORE ring. NOT a save edit.
 
-CONFIRMED FACTS
-- Observed starting gear (from a real fresh save): fighter shoes/jacket/buckler/sword
-  (catalog idx 4,8,0x22,0x2C), scout shoes/leather/dagger (4,9,0x2B), magician shoes/robe/rod
-  (4,0x14,0x30), priestess shoes/robe/bludgeon (4,0x11,0x31). All are catalog records copied with
-  the price byte replaced by quantity 1 - there is NO separate starting-gear record template
-  anywhere in either binary (searched for every gear record with qty=1: no hits).
-- Catalog bases: DRAKM DS:1F34 (idx 4..0x2A) + DS:201E (idx 0x2B..0x32);
-  DRAKTJ DS:1DE8 + DS:1ED2. DRAKTJ DGROUP file base = 0x22DF0.
-- **DRAKTJ (the creator) does NOT build inventory**: an exhaustive scan finds no 6-byte record copy
-  anywhere in its creation region (0x12000-0x14000). So the grant happens in the GAME, not the
-  creator - the earlier plan to patch DRAKTJ was based on a wrong premise.
+**Root cause of every earlier dead end: DRAKM.CC1 contains TWO MZ executables.**
+`chunks[0]` (34 KB, DGROUP 0x06B8) is the **character creator**; `chunks[1]` (149 KB,
+DGROUP 0x1FD4) is the game engine. `drakmod.Builder` only ever loaded chunk 1, so the two
+rounds spent patching the engine's weapon tables (DS:1AF3 in DRAKTJ, then DS:1C3F in DRAKM)
+could never have worked - those tables drive random loot, and the creator is a different
+binary that carries its own copy of the item catalog.
 
-RULED OUT (do not re-investigate)
-- DS:0D00 (0x1C stride) - creation spec: names/stat-template/MP class/sprites, no gear.
-- DS:1AC3 (DRAKTJ) / DS:1C0F (DRAKM), 8 rows x 6 - per-class ARMOUR/WEAPON TIER lists (helmet
-  tiers etc., used by shops+loot), not starting gear.
-- DS:187A - signed coordinate deltas. The 0x1AC3-indexing sites at DRAKTJ 0x0F110/0x1A670 and
-  DRAKM 0xCA20 are all SHOP buy/sell paths.
-- give-item 140D:0819 (DRAKTJ) / 1435:0815 (DRAKM): all 4 callers are shop code.
+Full map of the record layout, the save format, the creator's catalog and the grant code is in
+**NOTES.md, "Character creation and starting equipment"**. Short version:
 
-BREAKTHROUGH (2026-08-25, later): the grant IS in DRAKTJ after all - the earlier "no inventory
-writes" conclusion was wrong because the copy goes through a helper, not literal offsets.
-- **give-item helper = DRAKTJ img 0x170E9**: takes (char_far, item_record_far, qty); finds the
-  first free slot via 0xB11:01AF, memcpy's 6 bytes to `record + 0x64 + slot*6`, then sets byte +5
-  to the qty argument (which is why starting gear = catalog record with price replaced by qty 1).
-  Four callers: 0x17361, 0x1744F (shop buy paths) and **0x17CAA, 0x17D64 (the auto-grant)**.
-- **STARTING-WEAPON TABLE = DS:1AF3**, 8 rows x 6 bytes, values are indices into catalog2
-  (DS:1ED2). Decoded:
-    row0 dagger x6      row1 sword,sword,sword,swordlg,swordlg,sabre
-    row2 bludgeon x6    **row3 BOW x6**      row4 rod x6
-    row5 sword..sabre   row6 sword..drags    row7 dagger/sword mix
-  Observed fresh-party weapons map to rows: fighter->1, scout->0, magician->4, priest->2, so the
-  row is class-derived and **row 3 (all bow) already exists** - the mechanism we want is shipped.
-- Armour/other gear uses the sibling site at img 0x17D35 with table **DS:1AC3** (also 8x6) into
-  catalog1 (DS:1DE8).
-- The column index is `rand(4) + [0x5F06]/2` (a stat), i.e. better stats -> better starting tier.
+- Party = 4 records x 0x19A at DS:5A2E. Item array at record **+0x64**, 8 slots x 6 bytes.
+  Slots 0/1 are the innate attack/defence slots the monster spawner fills; player gear starts
+  at slot 2, which is why `find_free_slot` was a red herring.
+- PERSO.SAV: `buf[i] ^= i & 0xFF`, then `buf[4..0x66B]` -> DS:5A2E, so **file offset 4 is
+  character 0**.
+- The grant is four/three 27-byte blocks in chunk 0 at img 0x02DBC..0x02F60, each a plain
+  6-byte `memcpy(creator_catalog_record, record + slot_offset)`. Changing a class's starting
+  item is a two-byte edit of one `mov ax,imm16` operand. Entry points: fighter 0x02DB9,
+  scout 0x02E3C, priest 0x02EA4, mage 0x02F0C.
+- The creator catalog (chunk-0 DS:0DA4) stores price `01 00` on every record - that, not any
+  code, is why every starting item in a save has byte 4 = 01.
 
-**CRITICAL TOOLING FIX** (cost hours): DRAKTJ chunk0 is its own MZ EXE with a **0x2800-byte
-header** (640 paragraphs; DRAKM's is 0x2A00). Converting seg:off -> file offset REQUIRES
-`file = 0x2800 + seg*16 + off`. Its DGROUP segment is **0x205F** (so DS:x -> file
-0x2800 + 0x205F*16 + x). Without the header offset, disassembly silently lands mid-instruction and
-looks like unrelated code - that is what made 161C:0342 appear to be a draw routine.
+SHIPPED: `mod_startgear.py` repoints the scout's weapon from the dagger (DS:0E8E) to the bow
+(DS:0EB8) and raises the bow's power 6->8 in the creator's catalog so it agrees with `mod_bow`
+(the creator has its own catalog; mod_bow's edit to the engine copy does not reach a starting
+item). Installer key `startgear`, depends on `bow` for the "arch" -> "bow" rename.
 
-USER CORRECTION (2026-08-26): do NOT infer row<-class from save slot order. Slot order is the
-order the PLAYER creates characters in, not a class id. (In the reference fresh save the user
-created Fighter, Scout, Magician, Priest in that order, so slots 0-3 map to those classes - but
-that is the user's chosen order, not evidence about table rows.) Find explicit class-keyed code.
+PROOF (`verify_startgear.py`): loads chunk 0, applies its relocations and **executes** each
+class's gear routine under unicorn against a blank record. On the STOCK binary the emulated
+output reproduces a real PERSO.SAV byte-for-byte for all four characters - and independently
+recovers the creation order. On the patched binary the scout's slot 4 becomes
+`2f0108410100` (bow, power 8) with every other class untouched and shoes still shared by all
+four. The generated installer, run on stock files, reproduces the reference build exactly.
 
-ROW SELECTOR, correctly disassembled: `161C:0342` is a **bitfield getter** - args
-(field_index, packing_byte, 0). The weapon row is `getter(0x58, 0x30)`, armour `getter(0x5a, 0x20)`.
-It reads word[field_index] from a far pointer at **DS:5F30** and masks it with
-DS:2FC0[hi_nibble - lo_nibble] (mask table = 0,1,3,7,0F,1F,3F,7F).
-DS:5F30 is set at img 0x19762 to `buf + word[buf+8]` after a loader reads a **210-byte** file into
-DS:5F44. TESTED AND FALSIFIED: feeding OBJET.6SR through that chain yields word[0x58]=0 and
-word[0x5a]=0, i.e. dagger/first-tier for everyone - which contradicts the observed fighter sword.
-So either a different 210-byte file is loaded on this path, or DS:5F30 is re-pointed elsewhere
-before the grant runs.
-NEXT: identify the file that loader opens (walk back from img 0x19710 to its filename/open), or
-find other writers of DS:5F30. Then read field 0x58 per class from the real source.
+TOOLING: `Builder.img0` now exposes chunk 0; chunk-0 edits journal to fragments.json as
+`writes0` and are applied by `fragsim.apply_writes0`, `install.py apply_creator_fragments`
+and `install.ps1 Apply-CreatorFragments`. No relocation bookkeeping is needed there because
+these edits are immediate operands. `probe_startgear.py` was deleted - it targeted chunk 1.
 
-NOTE ON THE RING: rings are NOT catalog items (the catalog starts at shoes), so a starting RESTORE
-ring cannot come from this table at all. Granting one needs a synthesised 6-byte record passed to
-the give-item helper - a code hook, not a data edit. Split it from the bow half.
+ALSO DONE - the MAGICIAN's RESTORE ring (`mod_startring`, installer key `startring`, depends on
+`ring`). Rings are not catalog items, so this needed a synthesised record plus somewhere to put
+it. Both problems solved without adding code: the creator's catalog is private and chunk 0 has no
+computed indexing into it, so 37 of its 47 records are provably unreachable (222 B of dead space),
+and a grant block's byte COUNT is an immediate - widening the magician's last block to 30 bytes
+over `[rod][zeros x3][ring]` lands the rod where it already went and the ring in the magic-item
+array at +0x94. Emulation confirms the magician keeps shoes/robe/rod and gains a worn
+`8f 12 60 07 00 00` RESTORE ring. Full detail in NOTES.md, "Magic items".
+
+ALSO DONE - gear is EQUIPPED at creation (`mod_startworn`, installer key `startworn`, no deps).
+Stock creation sends the party out naked with the gear in the inventory. TWO fields are needed:
+bit 7 of an item's flags byte (worn - lights it up in the inventory), AND record +0x56, the slot
+index of the HELD WEAPON (0x7F = empty handed), which is what actually puts a weapon in someone's
+hands. v1 set only bit 7 and the user correctly reported "inventory looks on, but no one is
+holding their weapons"; confirmed live with probe_equip.py against a hand-re-equipped character.
+The creator's four +0x56 writes are an unrolled loop over PARTY SLOTS, not classes, so the
+fighter's buckler/sword destinations are swapped to put every class's weapon in slot 4 and all
+four writes become 4. Runs last in the build so it also catches the bow and the
+startring pool. `verify_startgear.py --matrix` proves all 7 combinations of the start* mods.
 
 ### 17. Steam version support — **DONE** (2026-08-25)
 The Steam release = GOG stock with exactly ONE byte changed per engine (.CC1): Steam's own

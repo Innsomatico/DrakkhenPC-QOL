@@ -250,3 +250,244 @@ ring - patched into the CREATION CODE so every new character gets them. NOT a sa
   ring identity must live in the variant byte +1, unconfirmed until a save containing a ring is read.
 - OBJET.SAV / objet.6sr: 210-byte world-object pickup state, u32 header; NOT inventory, NOT XOR-coded.
 - ACTIV.SAV: 360 activity flag bytes.
+
+---
+
+## Character creation and starting equipment  (solved 2026-08-26)
+
+### DRAKM.CC1 has TWO executables
+
+`drakpack.unpack_container(DRAKM.CC1)` yields **two chunks, both MZ images**:
+
+| chunk | size | header | DGROUP | what it is |
+|-------|------|--------|--------|------------|
+| 0 | 34378 B image (36938 raw) | 0x0A00 | **0x06B8** (linear 0x6B80) | **the character creator** |
+| 1 | 149152 B image | 0x2A00 | 0x1FD4 (linear 0x1FD40) | the game engine |
+
+`drakmod.Builder` only ever loaded `chunks[1]`, so every mod and every probe so far has
+touched the engine alone.  That is why two rounds of patching the engine's weapon tables
+produced no change to starting gear: **the creator is a different binary.**
+
+Chunk 0 is confirmed as the creator by its class-mask writes - a jump table on the chosen
+class (0..3) at img 0x00B7B storing 1 / 2 / 4 / 8 into `es:[bx+0x37]` through the
+"character being edited" pointer at DS:217C.
+
+### Character record layout (both binaries, DS:5A2E in the engine)
+
+Party array = **4 records of 0x19A bytes at DS:5A2E** (ends 0x6096; the engine's own init
+loop at img 0x0580A walks exactly that range).  A second identical-stride array for
+monsters/NPCs lives at DS:60E6.
+
+| offset | field |
+|--------|-------|
+| +0x00 | name, 6 chars + NUL |
+| +0x37 | **class mask** - 1 fighter, 2 scout, 4 mage, 8 priest (a BITMASK, not an index) |
+| +0x38 | class group |
+| +0x46..+0x4B | the six stats |
+| +0x53 / +0x55 | HP max / current |
+| +0x5F / +0x60 | MP max / current |
+| **+0x64** | **item array: 8 slots x 6 bytes** (ends +0x93) |
+| +0x94 | spell array: 8 slots x 6 bytes |
+| +0xC4 | third 8 x 6 array |
+
+`find_free_slot` (0B20:01AA, img 0xB3AA) scans `es:[bx + slot*6 + 0x67]` for a zero over 8
+slots - +0x67 is `0x64 + 3`, i.e. the item **id** byte, so a slot is free iff its id is 0.
+
+Item record = 6 bytes: `[0] flags (low nibble = class mask allowed to use it), [1] ?,
+[2] power, [3] item id, [4..5] price word`.
+
+**Slots 0 and 1 are the innate attack / innate defence slots.**  The monster spawner at
+img 0x10F02 fills them (`[0x64]=0x21`, `[0x67]=4`; `[0x6a]=0xC0`, `[0x6d]=4`) - natural
+weapon and hide.  Player characters leave them empty, which is why party gear starts at
+slot 2 and why `find_free_slot` was a red herring.
+
+### PERSO.SAV format
+
+1994 bytes = 0x7CA.  Load path is img 0x04500..0x0460A:
+
+```
+buf[i] ^= (i & 0xFF)      for i < 0x7C8       ; checksum word stored at buf[0x7C8]
+buf[0], buf[1]  -> two locals
+buf[2..3]       -> DS:6CF0   (current character index)
+buf[4..0x66B]   -> DS:5A2E   (0x668 = 4 x 0x19A, the whole party array)
+```
+
+So **file offset 4 is character 0's record base**; add 4 to every record offset above to
+get a file offset.  The save is marshalled through a heap buffer at `[0x53F4]`, not
+memcpy'd directly, which is what made the offsets look shifted at first.
+
+### The starting-gear grant  -  DRAKM.CC1 chunk 0, img 0x02DBC..0x02F60
+
+The creator has **its own copy of the item catalog** at chunk-0 img 0x07924 = **DS:0DA4**,
+47 records of 6 bytes, same order as the engine's catalog at DS:1F34.  In the creator's
+copy the price word is `01 00` for *every* record - that, not any code, is why every
+starting item in a save has byte 4 = 01.
+
+Gear is granted as four/three identical 27-byte blocks, one per item, no tables and no
+`give_item` call - a straight 6-byte memcpy per item:
+
+```
+mov ax,6                ; count
+push ax
+mov dx,[bp+8]           ; character record, seg
+mov ax,[bp+6]           ; character record, off
+add ax,0x70             ; DESTINATION  0x70/0x76/0x7C/0x82 = item slots 2,3,4,5
+push dx / push ax
+push ds
+mov ax,0x0DA4           ; SOURCE  = creator catalog record
+push ax
+lcall 02AD:00D8         ; memcpy(src, dst, 6)
+mov sp,bp
+```
+
+The source operand is the only thing that varies.  Patch the `mov ax,imm16` at these
+addresses to change what a class starts with:
+
+| class | slot 2 (shoes) | slot 3 (armour) | slot 4 (weapon) | slot 5 |
+|-------|----------------|-----------------|-----------------|--------|
+| Fighter | 0x02DCD `0DA4` | 0x02DE8 `0DBC` jacket | 0x02E03 `0E58` buckler | 0x02E1E `0E94` sword |
+| Scout   | 0x02E50 `0DA4` | 0x02E6B `0DC2` leather | 0x02E86 `0E8E` dagger  | - |
+| Priest  | 0x02EB8 `0DA4` | 0x02ED3 `0DF2` robe    | 0x02EEE `0EB2` bludgeon| - |
+| Mage    | 0x02F20 `0DA4` | 0x02F3B `0E04` robe    | 0x02F56 `0EAC` rod     | - |
+
+(addresses are the imm16 operand itself - the `b8` opcode is one byte earlier.  Shoes are
+the same record for all four, the invariant that confirms the read.)  The fighter block also sets +0x5B=3,
++0x5C=3, +0x38=6 before returning.
+
+Creator catalog record address = `0x0DA4 + catalog_index * 6`.  Useful ones:
+
+| item | idx | DS addr | record |
+|------|-----|---------|--------|
+| shoes | 0 | 0DA4 | `4f0100080100` |
+| jacket | 4 | 0DBC | `4f02000e0100` |
+| leather | 5 | 0DC2 | `4f04000f0100` |
+| priest robe | 13 | 0DF2 | `48041e170100` |
+| mage robe | 16 | 0E04 | `44041e1a0100` |
+| buckler | 30 | 0E58 | `4f05142d0100` |
+| dagger | 39 | 0E8E | `2f0205360100` |
+| sword | 40 | 0E94 | `2f0208380100` |
+| rod | 44 | 0EAC | `2f02083e0100` |
+| bludgeon | 45 | 0EB2 | `2f02063f0100` |
+| **bow** | 46 | **0EB8** | `2f0106410100` (last record; zeros follow) |
+
+Note the creator's catalog is independent of the engine's, so `mod_bow`'s power change to
+the engine catalog does NOT reach a bow handed out at creation - patch chunk 0's copy too.
+
+### Engine-side item facts (chunk 1) found on the way
+
+* Engine catalog: **DS:1F34**, 47 records, index 0..46, bow last.  Orphan filename strings
+  begin immediately after at DS:204E.
+* `item code = catalog index + 4` (armour codes 4..0x2A read `code-4` from DS:1F34;
+  weapon codes 0x2B+ read `code-0x2B` from DS:201E, which is catalog record 39).  The bow
+  is item code 50 = 0x32.
+* Loot tier tables: **DS:1C0F armour**, **DS:1C3F weapons**, 8 rows x 6 columns of catalog
+  indices.  Weapon row 3 is already all-bow.  These drive random drops (`give_item` callers
+  at img 0x0CA6A / 0x0CB0F), NOT starting gear.
+* `give_item` = **1435:0815, img 0x14B65**: finds a free slot, memcpy 6 bytes from a catalog
+  record to `charptr + slot*6 + 0x64`, sets `[+5] = qty`, refreshes.  Only 4 callers, all
+  loot/shop - none in the creation path.
+
+### Magic items (rings / sceptres / phials) and the starting ring  (2026-08-26)
+
+**Rings are not catalog items.**  The catalog covers ids 0x08..0x41.  Rings, sceptres, phials and
+two unnamed kinds live in a separate id space produced by the engine's magic-item creator at
+img 0x14AB8, which BUILDS a record instead of copying one:
+
+```
+slot = find_free(charptr)          ; 0B20:0173 - scans es:[bx + slot*6 + 0x97], 8 slots
+dst  = charptr + slot*6 + 0x94     ; the MAGIC-ITEM array, not the +0x64 item array
+dst[0] = 0x0F                      ; flags
+dst[1] = variant                   ; spell index  (0xFF forced when type == 4)
+dst[2] = (type << 5) | arg
+dst[3] = DS:1BF9[type]             ; type -> id
+dst[4] = dst[5] = 0                ; price
+```
+
+`DS:1BF9 = 04 05 06 07 42 43`, so **type 3 -> id 0x07 = ring**.  Verified against a real save: a
+phial reads `1f 00 40 06 00 00` (type 2, byte2 = 2<<5) and the 0x42 / 0x43 items read byte2 =
+0x80 / 0xA0 - all three agree with `(type << 5)`.
+
+So a character record holds **three** 8-slot x 6-byte arrays: **+0x64 items**, **+0x94 magic
+items**, **+0xC4** (third kind).  `mod_ring` scans +0x64 for 14 slots, which happens to run to
++0xB7 and therefore covers the magic array too - that is why a worn ring at +0x94 is picked up.
+
+A worn RESTORE ring is therefore `8f 12 60 07 00 00` (bit 7 = worn, variant 18 = RESTORE,
+(3<<5)|0, id 7, price 0).
+
+**Dead space in chunk 0.**  The creator's copy of the catalog at DS:0DA4 is private to it, and
+chunk 0 contains **no `mov dx,6 / mul dx` anywhere** - there is no computed indexing into that
+table at all.  The only way any code there can reach a record is a direct `mov ax,imm16`, and all
+twelve of those are the gear-grant blocks.  Exactly **10 of the 47 records are referenced**; the
+remaining **37 (222 bytes) are unreachable** - a complete proof, not a heuristic.  That is the
+only proven dead space in chunk 0.
+
+Do NOT use the 422-byte zero run after the catalog (DS:0EBE): it is a **10 x 42-byte string
+table** filled at runtime, indexed by `(idx - 0xF1) * 0x2A + 0x0EBE` at img 0x03052 and passed to
+a string-width routine.  The other zero runs in chunk 0 (ds:034d, ds:005b, ds:10db, ds:0507) are
+all referenced too.  There is no padding between functions - the magician's routine ends with
+`retf` at 0x02F73 and the next `push bp` is at 0x02F74 - so a grant block cannot be appended.
+
+**Granting the ring with no new code** (`mod_startring`): a grant block's byte COUNT is an
+immediate as well.  The magician's last block copies 6 bytes to +0x7C.  Pointing it at 30
+contiguous dead catalog bytes laid out as `[rod][zeros][zeros][zeros][ring]` and raising the
+count to 30 makes the single memcpy fill +0x7C (rod, unchanged), +0x82/+0x88/+0x8E (zeros, which
+are already zero at creation) and **+0x94** - magic-item slot 0.  The magician keeps every item
+it had and no code is added or moved.
+
+Rule of thumb that falls out of all this: giving any class any **catalog** item is a two-byte
+edit of one source operand.  Anything outside the catalog needs a synthesised record, and the
+count/destination operands are the levers for placing it.
+
+### Equipping the starting gear  (mod_startworn, 2026-08-26)
+
+Stock creation sends the party out **naked with the gear sitting in the inventory** - it never
+equipped anything, so there was no existing mechanism to copy.
+
+Two separate things make a character actually equipped:
+
+**1. Bit 7 of the item's flags byte = worn.**  Confirmed against a played save: worn items read
+0xDF / 0xD4 / 0xBF and the same items unworn read 0x5F / 0x54 / 0x3F, with several worn at once
+(tunic + jacket + shield + sword), so there is no single equip slot to conflict with.  Since a
+granted item is a verbatim copy of a creator catalog record, this is set at the source: OR 0x80
+into the flags byte of every record a grant block can copy from.
+
+**2. Record +0x56 = the item-slot index of the HELD WEAPON** (0x7F = empty handed).  Bit 7 alone
+only lights the item up in the inventory list - this is what puts a weapon in the character's
+hands.  The engine's own equip handler maintains it (img 0x0B6D4):
+
+```
+xor es:[bx], 0x80          ; toggle worn on the item
+test es:[bx], 0x20         ; bit 5 marks the item as a weapon
+   charptr[+0x56] = 0x7F   ;   nothing held
+   if now worn: charptr[+0x56] = that item's slot index
+```
+
+Proven live with a read-only probe of the running game (`probe_equip.py`): a character the player
+had re-equipped by hand read **+0x56 = 02** with its weapon in slot 2, while characters given gear
+by this mod read **+0x56 = 0x7F** and held nothing - exactly the reported symptom.  Armour needs
+nothing extra; only weapons (flags bit 5 = 0x20) have an index field, and +0x57 stays 0x7F even
+for a character wearing a shield.
+
+The creator writes +0x56 = 0x7F in four `mov byte es:[bx+0x56], 0x7F` instructions at chunk-0 img
+0x02C34 / 0x02CAE / 0x02D2B / 0x02DA8.  Those are one **unrolled loop over the four PARTY SLOTS**
+(each is followed by `add [bp-4], 0x19A`), not per class, so they cannot carry a per-class value.
+The fix is therefore to give every class its weapon in the SAME slot and write that one index:
+the fighter's buckler and sword destinations are swapped so its sword lands in slot 4 like every
+other class's weapon, then all four writes become 4.  Both halves are immediate edits.
+
+Bit 4 (0x10) is deliberately NOT set.  It means "revealed in the inventory list": the list draw
+skips items without it (img 0x0BA39) and the game bulk-sets it across every slot when the
+inventory opens (img 0x0B2F0).  That is why played saves carry it everywhere and fresh ones do
+not - the game does it itself.
+
+The equipped-record list is the **union** of every record any grant block can point at under any
+mod selection - the ten stock sources, the bow (live only with mod_startgear) and the
+mod_startring pool (live only with that mod).  It is spelled out rather than scanned so the
+recorded fragment does not depend on which other mods were in the reference build; setting the
+bit on a record the current selection does not use is harmless, since those records are
+unreachable dead space.  `mod_startworn` runs LAST in the build, and `mod_startring` copies the
+rod out of the catalog as it stands so the equipped bit carries into its pool.
+
+`verify_startgear.py --matrix` emulates the creator for every combination of the three start*
+mods and reports, per class, the weapon's slot and the held-weapon field.  Without `startworn`
+every class must still read "naked" (stock behaviour); with it, every class must hold its weapon.

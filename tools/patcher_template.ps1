@@ -194,6 +194,23 @@ function Ask-Selection {
     return $sel
 }
 
+# Chunk 0 of DRAKM.CC1 is the character creator (a second MZ image).  Mods that change what a
+# new character starts with edit immediate operands there, so no relocation work is needed.
+function Apply-CreatorFragments([byte[]]$c, $selected) {
+    foreach ($name in $frags.order) {
+        if (-not $selected.Contains($name)) { continue }
+        $w0 = $frags.frags.$name.writes0
+        if ($null -eq $w0) { continue }
+        foreach ($w in $w0) {
+            $off = [int]$w[0]; $hex = $w[1]
+            for ($i = 0; $i -lt $hex.Length; $i += 2) {
+                $c[$off + ($i / 2)] = [Convert]::ToByte($hex.Substring($i, 2), 16)
+            }
+        }
+    }
+    return ,$c
+}
+
 function Apply-Fragments([byte[]]$c, $selected) {
     $ro = [BitConverter]::ToUInt16($c, 24); $nrel = [BitConverter]::ToUInt16($c, 6)
     $hdr = [BitConverter]::ToUInt16($c, 8) * 16
@@ -319,6 +336,7 @@ foreach ($f in @{ 'DRAKM.CC1' = $drakmBytes; 'RESI_VGA.6C0' = $resiBytes }.GetEn
 Write-Host 'decoding DRAKM.CC1 ...'
 $chunks = [DrakPack]::UnpackContainer($drakmBytes)
 if ($steam) { $chunks[1][0x11D87] = 0x75 }   # normalize Steam's protection byte back to stock
+$chunks[0] = Apply-CreatorFragments $chunks[0] $sel
 $chunks[1] = Apply-Fragments $chunks[1] $sel
 $newDrakm = [DrakPack]::PackContainer($chunks)
 if ($fullSel -and (Get-Sha $newDrakm) -ne $modDrakmSha) { Fail 'rebuilt DRAKM.CC1 failed verification - nothing was changed.' }

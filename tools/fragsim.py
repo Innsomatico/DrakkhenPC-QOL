@@ -13,6 +13,19 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 GAME = os.path.dirname(HERE)
 
 
+def apply_writes0(stock_chunk0, meta, selected):
+    """Chunk 0 is the character creator.  Its mods are plain immediate edits - no relocation
+    bookkeeping - so applying them is just laying the recorded runs back down in order."""
+    c = bytearray(stock_chunk0)
+    for name in meta['order']:
+        if name not in selected:
+            continue
+        for off, hx in meta['frags'][name].get('writes0', []):
+            b = bytes.fromhex(hx)
+            c[off:off + len(b)] = b
+    return bytes(c)
+
+
 def apply_selection(stock_chunk1, meta, selected):
     """stock_chunk1: decoded chunk 1 (MZ header + image). Returns patched chunk bytes."""
     c = bytearray(stock_chunk1)
@@ -71,7 +84,8 @@ def main():
 
     # full selection must be byte-identical to the reference build
     full = apply_selection(sc[1], meta, set(meta['order']))
-    out = drakpack.pack_container([sc[0], full])
+    full0 = apply_writes0(sc[0], meta, set(meta['order']))
+    out = drakpack.pack_container([full0, full])
     print('FULL selection == reference build:', out == ref)
     assert out == ref
 
@@ -83,9 +97,17 @@ def main():
         {'partyxp', 'bow', 'levelup'},
         {'compass', 'map', 'noprotect', 'hints'},
         {'noprotect', 'ring', 'itemname'},
+        {'startgear'},
+        {'startgear', 'bow'},
+        {'startring', 'ring', 'noprotect'},
+        {'startworn'},
+        {'startgear', 'startworn', 'bow'},
+        {'startgear', 'startring', 'startworn', 'bow', 'ring', 'noprotect'},
     ]
     for sel in cases:
         c = apply_selection(sc[1], meta, sel)
+        c0 = apply_writes0(sc[0], meta, sel)
+        assert len(c0) == len(sc[0]), 'creator chunk changed size'
         print('partial %-45s ok (relocs=%d)' % (sorted(sel), struct.unpack_from('<H', c, 6)[0]))
     print('all cases pass')
 

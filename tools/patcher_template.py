@@ -111,6 +111,20 @@ def fail(msg):
     print('ERROR: ' + msg); sys.exit(1)
 
 
+def apply_creator_fragments(chunk0, selected):
+    """Chunk 0 of DRAKM.CC1 is the character creator - a second MZ image.  Mods that change
+    what a new character starts with edit immediate operands there, so no relocation work is
+    needed: lay the recorded byte runs back down in canonical order."""
+    c = bytearray(chunk0)
+    for name in FRAGS['order']:
+        if name not in selected:
+            continue
+        for off, hx in FRAGS['frags'][name].get('writes0', []):
+            b = bytes.fromhex(hx)
+            c[off:off + len(b)] = b
+    return bytes(c)
+
+
 def apply_fragments(chunk1, selected):
     c = bytearray(chunk1)
     h = list(struct.unpack_from('<14H', c))
@@ -279,6 +293,7 @@ def main():
         c1[STEAM_FIX_OFF] = STEAM_FIX_VAL    # normalize Steam's byte back to stock
         chunks[1] = bytes(c1)
     engine_sel = set(FRAGS['order']) & sel
+    chunks[0] = apply_creator_fragments(chunks[0], engine_sel)
     chunks[1] = apply_fragments(chunks[1], engine_sel)
     new_drakm = pack_container(chunks)
     if full and sha(new_drakm) != MOD_DRAKM_SHA:
