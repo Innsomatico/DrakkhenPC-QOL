@@ -824,3 +824,14 @@ the original driver for SFX only).
   building, the inn at map cell (8,20).
 - v2.0 = v1.8.1 content, declared the stable final release. 20 selectable mods. The definitive-
   soundtrack project remains parked (see the feedback memory and ROADMAP section 4).
+
+### Why found rings/sceptres are blank (combed 2026-08-27, user question)
+- Item grants have two paths. (1) CATALOG grants - monster drops via tier tables DS:1C0F/1C3F
+  and shop buys - copy finished 6-byte records from DS:1F34 / DS:201E; those catalogs contain
+  NO rings or sceptres at all (the single enchanted droppable in the data: rod, variant 2,
+  catalog B index 5). (2) BARE-TYPE grants via the builder at 1435:076D, which fully supports
+  enchantments (variant = caller arg [bp+0xE], written to record +1; kind 4 forces 0xFF) - but
+  every ring/sceptre caller passes variant 0. Same shipped-unfinished signature as the unwired
+  ring effects: plumbing complete, data never authored.
+- Candidate future mod (NOT planned; project stable): patch bare-type call sites to roll
+  variants 1-23 for ring/sceptre grants -> enchanted loot exists in the world.
