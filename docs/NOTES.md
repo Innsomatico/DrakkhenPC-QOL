@@ -491,3 +491,53 @@ rod out of the catalog as it stands so the equipped bit carries into its pool.
 `verify_startgear.py --matrix` emulates the creator for every combination of the three start*
 mods and reports, per class, the weapon's slot and the held-weapon field.  Without `startworn`
 every class must still read "naked" (stock behaviour); with it, every class must hold its weapon.
+
+### Game text: the .XT files  (2026-08-26)
+
+Format is trivially editable: a big-endian u16 offset table (the first entry doubles as the
+header length, so `count = offs[0] / 2`), then the entries, each a run of NUL-separated display
+lines.  Entry n spans `offs[n] .. offs[n+1]`.
+
+Three distinct text files ship, NOT three copies of one:
+
+| file | entries | content |
+|------|---------|---------|
+| `0.?XT` | 96 | NPC / villager chatter |
+| `1.?XT` | 16 | letters and scrolls |
+| `2.?XT` | 32 | signposts, directions, quest text |
+
+Each is then duplicated **once per video mode**, and the suffix is what selects it:
+
+| binary | mode | text set opened |
+|--------|------|-----------------|
+| **DRAKM.CC1** | **VGA - the one this project patches** | **`.7xt`** |
+| DRAKE.CC1 | EGA | `.3xt` |
+| DRAKC.CC1 | CGA | `.1xt` |
+| DRAKTJ / DRAKTC | Tandy / Hercules | `.3xt` |
+
+`0.1XT == 0.3XT == 0.7XT` byte for byte (and likewise for 1 and 2) - 9 files, 3 distinct
+contents.  **A text mod therefore only needs to patch `0.7XT`, `1.7XT`, `2.7XT`.**
+
+Each binary also carries a SECOND live filename table naming an alternate set (`.4xt` for
+DRAKM/DRAKE/DRAKT*, `.2xt` for DRAKC) whose files are **not shipped in this release** - selected
+at 03AD:1918/1924, the same selector that leaves filename tables 1 and 2 orphaned.  So the
+engine's own dead space and this text redundancy come from the same cause: a 1990 multi-format
+release built from one tree, shipping the union of every configuration's asset set rather than
+pruning per SKU.  That redundancy is precisely why this project has room to work in.
+
+Translation quality is BETTER than expected - the scrolls and NPC dialogue are competent British
+English, not the mangled port people assume.  What actually reads as a translation is:
+
+* **French typography, 46 instances** across the three files: 28 x `space !`, 7 x `space :`,
+  5 x `space ?`, 5 x `space ;`, 1 x `space ,`.  French spaces before those marks; English does
+  not.  Also present in the engine's own UI strings ("Do you want to buy this object ?").
+* **Two typos**: `cemetary` (x2) and `Beware of it's children`.
+* **Item names squeezed to a display-width budget** (engine strings, not .XT): `arch` = bow
+  (French *arc*, fixed by mod_bow), `sword lg` = long sword, **`drags` = dragon sword** - the
+  strongest weapon in the game at power 55 / price 100 - and `greave` for greaves.
+
+Fixing the typography is pure deletion, so the files SHRINK and the offset table just gets
+rebuilt; no engine risk at all.  Item names are harder: they live in a packed NUL-separated block
+at **DS:2A46** (pointer installed at img 0x03BCC: `mov word [6CE8], 0x2A46`), located by ORDINAL
+via the index table at DS:1CBB, so lengthening one name has to be paid for by shortening another,
+and the inventory column is only ~7-8 characters wide before the suffix mod_itemname draws.
