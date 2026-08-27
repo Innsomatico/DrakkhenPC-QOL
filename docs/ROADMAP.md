@@ -35,7 +35,16 @@ risk: the HUD slot may truncate names at 7 characters — check the draw routine
 
 ## Requested — not started
 
-### 4. Music replacement (SNES tracks) — **not recommended**, effort XL, confidence low
+### 4b. TODO - installer cleanup option: back up and remove the 49 unreachable CGA/EGA/Tandy
+files (1.6 MB: *_CGA/*_EGA binaries, .1XT/.3XT texts, DRAKE/DRAKC/DRAKT* executables, unused
+drivers) - user-requested (2026-08-27). Backup for -restore; store verification also restores.
+
+### 4. Music replacement — REOPENED (2026-08-27): the IFGM driver interface (see NOTES) makes a
+MIDI replacement driver feasible: INT 0xF0 TSR speaking the same AH-function contract, output via
+emulated MPU-401 -> modern synth/SoundFont outside the 640K box. Old assessment below kept for
+history; new effort estimate: L (driver M + command semantics S + music transcription M-L).
+
+### (historical) Music replacement (SNES tracks) — **not recommended**, effort XL, confidence low
 **Correction:** an earlier note here claimed the game emits MIDI. It does not. `MIDI:Opened
 device:win32` in DOSBox's log is DOSBox initialising its own MIDI subsystem at startup, whether or
 not the game uses it. All three `DRDRIVER.?C1` sound drivers reference **port 388h (AdLib/OPL2)** and

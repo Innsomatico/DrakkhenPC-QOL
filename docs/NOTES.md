@@ -733,3 +733,34 @@ taunt is unreachable), and the +5-HP add+clamp (23 bytes at img 0x2B70) rewritte
 Recuperation grant and status clear are preserved.  pay_richest itself is untouched: its only
 other caller is the priest's pay-for-information donation (img 0x39C3, fail -> text 0x5E),
 deliberately left as a paid flavor service.  User-verified at multiple temples.
+
+### The IFGM sound-driver interface  (music spike, 2026-08-27)
+
+Drakkhen's sound is a PLUGGABLE DRIVER STANDARD - exactly the seam needed to replace the music
+without touching the engine.
+
+* DRDRIVER.xC1 is a BPE-packed flat binary, loaded resident by the launcher (CONFIG.TAT pairs a
+  drdriver with each executable).  Decoded 6C1 = 3942 B: `jmp init` at offset 0, OPL instrument
+  patch records, init at CS:0xFE1 (file offset - 0x100: loaded COM-style at PSP:0x100).
+* Install: reads INT 0xF0's vector (0000:03C0); if handler+2 already reads "IFGM" it exits,
+  else installs its handler (CS:0xF5D) and TSRs (int 21/31).  Handler+2 carries the tag and a
+  variant name: **"IFGM ADLIB"**.
+* Handler: `BX=AH; call word cs:[BX+0xF41]` - AH is an EVEN function code into a word table.
+* Engine side (wrappers img 0x1AA4D..0x1AC60, presence flag cs:[6], 14 `int 0xF0` sites):
+  AH=00 detect, 02 init (after loading a file via 1BC6:0202/0255), 06+08 music-data segment
+  handoff (DX=seg, SI=ofs), 04 start, 0A music cmd (DX,CX,SI), 0C sfx cmd (one caller feeds a
+  table at DS:4D2), 0E stop, 10 enable.
+* The engine's own sound-event layer: sound_event(id) img 0x1E4F0 - ids 0..0x58 and negatives
+  to -0x23, priority byte table DS:4668, handler queue DS:7062 (4-byte far ptrs, count
+  DS:46CE), fixed vectors DS:46C2/46C6/46CA (engine default 07:xx installed img 0x1EC49).
+* MUSIC.8C1 = 20 BPE chunks, 60457 B decoded - song data in the AdLib driver's own format;
+  ~60 KB of OPL event streams.  Chip: AdLib OPL2 (YM3812), 2-op FM - the sound quality
+  ceiling of the ORIGINAL driver, not of the interface.
+
+REPLACEMENT PLAN (music project, phase 2+): write an "IFGM MIDI" TSR implementing the same
+INT F0 contract, translating music/sfx commands into MPU-401 UART writes (port 0x330) - DOSBox
+renders them via a modern synth/SoundFont OUTSIDE the 640K box (Staging: mididevice, fluidsynth).
+Accept and ignore the engine's music-data handoff; our tunes live in our own files.  Remaining
+unknowns before implementation: exact AH=0A/0C argument semantics (song numbering), and whether
+SFX should stay on OPL (probably yes - keep AH=0C forwarding to a minimal OPL voice, or chain to
+the original driver for SFX only).
