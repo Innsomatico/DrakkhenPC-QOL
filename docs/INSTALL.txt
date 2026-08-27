@@ -19,10 +19,10 @@ Mods included:
   * The scout starts with a bow instead of a dagger
   * Tavern rumors are free (stock escalates 50 -> 4000 jade per hint, saved
     per-party, silently pricing you out of information forever)
-  * A merchant shop in every zone: the stock game ships a full working shop
-    (sell, buy-back, loyalty discounts) placed in ONE building on the whole
-    island - now each zone's spare hut is a merchant, including one near the
-    Earth-zone start
+  * A merchant in the Earth (starting) zone: the stock game ships a full
+    working shop (sell, buy-back, loyalty discounts) placed in ONE building
+    on the whole island, outside the starting zone - now the lone Earth inn
+    is also a merchant (other zones untouched to keep quest NPCs safe)
   * The magician starts wearing a RESTORE ring (double regen, via the ring mod)
   * Copy-protection code prompt removed; video-card menu skipped (always VGA)
   * Optional cleanup: unused CGA/EGA/Tandy files (~1.5 MB) moved into the backup
