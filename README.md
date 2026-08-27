@@ -1,8 +1,18 @@
 # DrakkhenPC-QOL
 
+[![Latest release](https://img.shields.io/github/v/release/Innsomatico/DrakkhenPC-QOL?label=latest%20release&color=2ea44f)](https://github.com/Innsomatico/DrakkhenPC-QOL/releases/latest)
+[![Downloads](https://img.shields.io/github/downloads/Innsomatico/DrakkhenPC-QOL/total?color=blue)](https://github.com/Innsomatico/DrakkhenPC-QOL/releases)
+[![Wiki](https://img.shields.io/badge/docs-wiki-informational)](https://github.com/Innsomatico/DrakkhenPC-QOL/wiki)
+
 Quality-of-life patch for **Drakkhen** on PC (Infogrames, 1990) — the MS-DOS version sold on GOG
 (US release, VGA), as played under DOSBox. A set of small binary mods that make the game
 dramatically more playable without changing its character.
+
+## ⬇ Download
+
+**[Get the latest release zip here](https://github.com/Innsomatico/DrakkhenPC-QOL/releases/latest)** —
+unzip it, copy the installer into your Drakkhen game folder, run it, pick your mods.
+Full steps below in [Install](#install); uninstall any time with `-Restore`.
 
 ## Features
 
