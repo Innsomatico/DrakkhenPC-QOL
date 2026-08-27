@@ -35,9 +35,12 @@ risk: the HUD slot may truncate names at 7 characters — check the draw routine
 
 ## Requested — not started
 
-### 4b. TODO - installer cleanup option: back up and remove the 49 unreachable CGA/EGA/Tandy
-files (1.6 MB: *_CGA/*_EGA binaries, .1XT/.3XT texts, DRAKE/DRAKC/DRAKT* executables, unused
-drivers) - user-requested (2026-08-27). Backup for -restore; store verification also restores.
+### 4b. DONE (v1.6, 2026-08-27) - installer 'cleanup' mod: moves the 47 unreachable
+CGA/EGA/Tandy files (1.6 MB: *_CGA/*_EGA binaries, .1XT/.3XT texts, DRAKE/DRAKC/DRAKT*
+executables, unused drivers/music/saves variants) into _backup/unused; -restore moves them
+back. Requires the 'vga' mod (without the card pin those files are reachable). Round-trip
+verified byte-identical on a sandbox copy with both installers. Kept as ambiguous: GAME.7AL,
+END.8AL, GARDE.6AL, DRK* markers.
 
 ### 4. Music replacement — REOPENED and PLANNED as the "definitive soundtrack" project (2026-08-27):
 User vision: an amalgamation drawing the SNES version's expansive dynamic soundtrack (castles,

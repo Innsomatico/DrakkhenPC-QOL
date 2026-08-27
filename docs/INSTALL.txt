@@ -19,6 +19,8 @@ Mods included:
   * The scout starts with a bow instead of a dagger
   * The magician starts wearing a RESTORE ring (double regen, via the ring mod)
   * Copy-protection code prompt removed; video-card menu skipped (always VGA)
+  * Optional cleanup: unused CGA/EGA/Tandy files (~1.5 MB) moved into the backup
+    folder (they are unreachable once the video card is pinned to VGA)
 
 Install:
   1. Copy install.ps1 into your Drakkhen folder:
