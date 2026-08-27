@@ -39,7 +39,8 @@ risk: the HUD slot may truncate names at 7 characters — check the draw routine
 CGA/EGA/Tandy files (1.6 MB: *_CGA/*_EGA binaries, .1XT/.3XT texts, DRAKE/DRAKC/DRAKT*
 executables, unused drivers/music/saves variants) into _backup/unused; -restore moves them
 back. Requires the 'vga' mod (without the card pin those files are reachable). Round-trip
-verified byte-identical on a sandbox copy with both installers. Kept as ambiguous: GAME.7AL,
+verified byte-identical on a sandbox copy with both installers. User-verified in game
+(2026-08-27): game and creator both boot and run on the cleaned install. Kept as ambiguous: GAME.7AL,
 END.8AL, GARDE.6AL, DRK* markers.
 
 ### 4. Music replacement — REOPENED and PLANNED as the "definitive soundtrack" project (2026-08-27):
