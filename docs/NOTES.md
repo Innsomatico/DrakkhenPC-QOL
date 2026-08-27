@@ -701,3 +701,35 @@ Installer note: menu4 and menucolor both patch DRAKKHEN.COM, so the installers a
 a PIPELINE - stock source (the backup on re-runs), selected mods applied in canonical order, and
 the result verified against a per-combination hash table.  Verified live for all three
 selections: both, color-only (stock 5-item menu, colored), and menu4-on-top-of-color via backup.
+
+### The Anak temple: fees, the softlock, and mod_freetemple  (2026-08-27)
+
+**Money is per-character and 32-bit**: record +0x10/+0x12.  Found live (four values matched the
+user's in-game jade readout), and **+0x53 is LEVEL** (the earlier read of it as HP was wrong; HP
+is +0x4F max / +0x51 cur, dead == HP_cur 0).
+
+**temple_service (img 0x2A98)**, reached inside temples (zone id DS:679E flips 0x0F -> 0x0E on
+entry, observed live):
+
+```
+fee_base = level^3                 ; byte [bx+0x53] cubed
+dead  (HP_cur==0): amount = fee_base * 20     ; imm at img 0x2ADA
+alive:             amount = fee_base * 5      ; imm at img 0x2AF1
+pay_richest(amount32)              ; 0A4A:0821, img 0x0ACC1
+  -> scans all 4 records, the FATTEST purse pays; 0xFFFF if even that cannot afford
+on failure: dialogue 0x5F = "Riches cannot win your head. Die and without jade stay dead!"
+on success: +5 HP (img 0x2B70, clamped to max), sets Recuperation flags 0x6000, clears +0x2C,
+            then a 75-step restore animation
+```
+
+Verified live before patching: healing a level-2 character billed exactly 40 jade (2^3 x 5), and
+two consecutive heals were paid by two DIFFERENT characters - the richest at each moment.  The
+softlock: revive = level^3 x 20 (level 5 = 2500 jade), and a first-fight corpse's own pocket
+cannot pay for itself.
+
+**mod_freetemple** (key `freetemple`): both multiplier immediates -> 0 (free and ungated - the
+taunt is unreachable), and the +5-HP add+clamp (23 bytes at img 0x2B70) rewritten to
+`HP_cur = HP_max` + NOPs, so ONE visit fully heals and a revive returns at full HP.  The
+Recuperation grant and status clear are preserved.  pay_richest itself is untouched: its only
+other caller is the priest's pay-for-information donation (img 0x39C3, fail -> text 0x5E),
+deliberately left as a paid flavor service.  User-verified at multiple temples.

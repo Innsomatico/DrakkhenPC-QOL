@@ -19,6 +19,7 @@ dramatically more playable without changing its character.
 | **Gear equipped at creation** | Stock Drakkhen sends a new party into the world *naked*, with their starting equipment sitting unworn in the inventory — you equip a dozen-plus items by hand before anyone can fight. Now it is all worn from the first step, weapons in hand. |
 | **Scout starts with a bow** | The scout begins with a bow instead of a dagger — a ranged opener that actually suits the class. |
 | **Magician starts with a RESTORE ring** | The magician begins wearing a RESTORE ring: doubled regeneration from the very first step. (Uses the ring/sceptre mod above.) |
+| **Free temple healing** | Anak temples charged level³×5 jade to heal (a miserly +5 HP per visit) and level³×20 to revive — refusing outright if nobody could pay, so a party wiped early could *never* revive anyone. Now free, no gate, and one visit heals to full; the dead come back at full HP. |
 | **Class stat growth** | The stock game grants NO stat growth on level-up, ever. Now each class gains stats per level along class-appropriate lines (capped safely at 99). |
 | **No copy-protection prompt** | The "DRAKKHEN CODES" wheel-code interruption never fires. |
 | **Straight to VGA** | The video-card selection menu at launch is skipped. |

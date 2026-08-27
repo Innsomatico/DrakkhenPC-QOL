@@ -104,6 +104,7 @@ def main():
         ['startgear', 'Scout starts with a bow instead of a dagger', ['bow']],
         ['startring', 'Magician starts wearing a RESTORE ring', ['ring']],
         ['startworn', 'New characters start with their gear equipped', []],
+        ['freetemple','Anak temples heal and revive for free', []],
         ['partyxp',   'Party-shared kill XP', []],
         ['bow',       'Bow buff (power 8, arch renamed to bow)', []],
         ['noprotect', 'Remove the copy-protection prompt', []],

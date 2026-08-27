@@ -263,7 +263,7 @@ def build(mods):
     return p
 
 if __name__ == '__main__':
-    import mod_compass, mod_map, mod_regen, mod_partyxp, mod_itemname, mod_bow, mod_noprotect, mod_journal, mod_levelup, mod_ring, mod_startgear, mod_startring, mod_startworn
+    import mod_compass, mod_map, mod_regen, mod_partyxp, mod_itemname, mod_bow, mod_noprotect, mod_journal, mod_levelup, mod_ring, mod_startgear, mod_startring, mod_startworn, mod_freetemple
     import mod_spellfont, mod_novideomenu, mod_menu4, mod_menucolor
     # mod_regen is DROPPED (user's call, 2026-08-23): a crash on packing characters ended it.
     # The mod file and the research in NOTES.md/ROADMAP.md remain if it is ever revisited.
@@ -272,6 +272,7 @@ if __name__ == '__main__':
            ('bow', mod_bow.apply), ('noprotect', mod_noprotect.apply),
            ('hints', mod_journal.apply), ('levelup', mod_levelup.apply),
            ('ring', mod_ring.apply), ('startgear', mod_startgear.apply), ('startring', mod_startring.apply),
+           ('freetemple', mod_freetemple.apply),
            # startworn LAST: it flags the gear records other start* mods may have edited
            ('startworn', mod_startworn.apply)])
     # Data-only mods: these patch loose game files, not the engine, so they cost no dead space.

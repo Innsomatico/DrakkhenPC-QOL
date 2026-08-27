@@ -228,6 +228,13 @@ PARKED - menu background art (Blazej Kozlowski's wolf, credited): encoder/decode
 emulation, but every code-hosting spot in the launcher turned out live (see NOTES "The launcher");
 needs a debugger-traced session rather than more bisection. Research and assets preserved.
 
+ALSO DONE - free full temple healing (`mod_freetemple`, key `freetemple`, no deps): the Anak
+temple charged level^3 x5 to heal (+5 HP per visit!) and level^3 x20 to revive, billed to the
+richest party member, refusing outright when nobody could pay - the classic "die on the first
+fight, stay dead forever" softlock. Now free, ungated, and one visit heals to full (revives at
+full HP). Found by live memory diffing during play; fee formula verified against a real 40-jade
+charge before patching. User-verified at multiple temples.
+
 ### 17. Steam version support — **DONE** (2026-08-25)
 The Steam release = GOG stock with exactly ONE byte changed per engine (.CC1): Steam's own
 copy-protection skip (jne->jmp at decoded offset 0x11D87 in DRAKM), with .BAK files = untouched GOG

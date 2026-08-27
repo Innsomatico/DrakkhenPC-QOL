@@ -11,6 +11,7 @@
 "ring",
 "startgear",
 "startring",
+"freetemple",
 "startworn"
 ],
 "frags": {
@@ -310,6 +311,26 @@
 ]
 ],
 "writes": [],
+"radd": [],
+"rrep": [],
+"rdrop": []
+},
+"freetemple": {
+"writes0": [],
+"writes": [
+[
+21723,
+"00"
+],
+[
+21746,
+"00"
+],
+[
+21873,
+"8a474f26884751909090909090909090909090909090"
+]
+],
 "radd": [],
 "rrep": [],
 "rdrop": []
