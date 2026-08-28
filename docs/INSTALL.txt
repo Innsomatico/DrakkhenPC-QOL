@@ -19,6 +19,9 @@ Mods included:
   * The scout starts with a bow instead of a dagger
   * Tavern rumors are free (stock escalates 50 -> 4000 jade per hint, saved
     per-party, silently pricing you out of information forever)
+  * Found rings & sceptres are enchanted: stock loot always rolled BLANK
+    jewelry (the effect system existed, the data was never authored). Found
+    rings/sceptres now roll one of the seven real effects and show their name
   * A merchant in the Earth (starting) zone: the stock game ships a full
     working shop (sell, buy-back, loyalty discounts) placed in ONE building
     on the whole island, outside the starting zone - now the lone Earth inn

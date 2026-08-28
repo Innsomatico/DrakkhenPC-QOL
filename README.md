@@ -22,8 +22,9 @@ Full steps below in [Install](#install); uninstall any time with `-Restore`.
 | **World map on `M`** | Press M in the world view: a full-viewport map of the island with your position flashing. Any key closes it. |
 | **Readable spells** | The runic spell/phial font replaced with Latin letters — spell names are plain English (they always were underneath; one rune = one letter). |
 | **Party-shared XP** | Kill XP is split: every living party member gets 1/4 of each award instead of 100% to the killer (Final Fantasy style). |
-| **Item identification** | Rings, staffs and phials show *which* one they are — the contained spell's name is drawn next to the type name. |
+| **Item identification** | Rings, sceptres and phials show *which* one they are — drawn as `ring-RESTORE`, tight to each type name. A stock bug that leaked the raw variant byte as a stray character is also fixed. |
 | **Bow buff** | The bow ships as the weakest weapon in the game (power 6, tied with the bludgeon). Now power 8 — on par with the short sword, worth carrying without breaking the curve — and renamed from "arch". |
+| **Enchanted loot** | Stock item sources never author enchantments — every found ring/sceptre rolled *blank* (the drop catalogs contain none, and every other grant passes variant 0). Found rings and sceptres now roll one of the seven real effects, named and working. |
 | **Working rings & sceptres** | Stock Drakkhen shipped seven passive effects (Invisibility, Protection, Recuperation, Acceleration, Power, Understanding, Impalpability) that no item ever granted — worn rings did nothing. Now a worn ring/sceptre grants its spell's effect; Recuperation doubles regen. |
 | **Quest hints on `H`** | An opt-in hint list for the main quest: SPACE reveals the next step, so spoilers are your choice. |
 | **Gear equipped at creation** | Stock Drakkhen sends a new party into the world *naked*, with their starting equipment sitting unworn in the inventory — you equip a dozen-plus items by hand before anyone can fight. Now it is all worn from the first step, weapons in hand. |
